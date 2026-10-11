@@ -17,21 +17,30 @@ CUDA実機・実サイズの基盤モデルによる学習／生成品質・個�
 
 [操作ガイド](docs/usage.md) / [試験結果・検証範囲](docs/verification.md)
 
-## インストール
+## Windowsへのインストール・更新
 
-[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) からZIPを取得し、展開してください。
-Python 3.12または3.13が必要です。Windowsは `Install-Windows.bat`（GPU版を選択）、`Start-Windows.bat`。
-Linuxは `./install.sh --gpu`、`./start.sh`。通常版なら `./install.sh` でデータ準備・整理・コースを使えます。
-インストーラーは専用 `.venv` に依存ライブラリを導入するPythonスクリプトです。
-Windows 10 / 11（64bit）は公開リリースの `DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe` を実行してください。
-Python同梱のセットアップです。インストール後はデスクトップまたはスタートメニューの「DeeL Pyess」で起動します。
-上記のBAT手順は開発者向けソースZIPの手順です。一般のWindows利用者にはセットアップEXEを提供します。
-画像・動画／日本語音声・声質の追加機能は、起動ウィンドウのボタンでダウンロードできます。
-このウィンドウを閉じるとサーバーも終了します。データと診断ログは `%LOCALAPPDATA%\DeeL Pyess` に保存し、
-アプリをアンインストールしても学習データを保持します。EXEは未署名です。Mac用アプリ・APKは提供していません。
+[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.3-Windows-x64.exe` を取得して実行してください。
+Windows 10/11・64bit用、Python同梱です。既存のDeeL Pyessを終了し、同じ保存先へ上書き更新できます。
+デスクトップの「DeeL Pyess」で起動し、「このPCのAI機能をセットアップ」を実行します。
+投稿データ・完成モデルは `%LOCALAPPDATA%\DeeL Pyess\data`、診断ログは同フォルダのstartup.logです。
+アンインストールでもデータを保持します。EXEは未署名です。
 
-スマートフォン用はPCで `Start-Phone.bat`／`./start-phone.sh` を実行し、同じ信頼できるWi-Fiで
-表示された接続URLを開きます。計算はPCのCUDA GPUで実行します。接続コードは起動ごとに変わります。
+### 一般のノートPC向け（v0.1.3）
+
+NVIDIA CUDA、Windows DirectML（AMD/Intelなど）、CPUを区別して診断します。
+AMD/IntelはCUDAを使用できません。DirectMLは独立環境に導入し、CUDA/CPU用のPyTorchを上書きしません。
+「作品をつくる」で「Tiny-SD / 軽量画像」を選ぶと、256pxの画像を生成して指定サイズへ拡大します。
+GPUの演算非対応・メモリ不足時はCPUで再試行し、使用した環境を結果に記録します。
+初回セットアップは数GBのダウンロード、Tiny-SDの重みは約1.3GBです。RAM 8GB以上を目安としてください。
+全GPU・全演算の保証はできません。画像LoRA学習、動画、大型モデルは十分なVRAMを持つCUDA GPUが必要です。
+日本語音声と声質特徴抽出はCPUでも利用できます。CPUでは処理に時間がかかります。
+
+### Linux・開発者向けソース版
+
+ソースZIPを展開し、Python 3.12/3.13で `./install.sh`、`./start.sh` を実行します。
+AI機能は仮想環境で `python -m studio.setup_runtime --backend cpu`、NVIDIAは `--backend cuda` を指定できます。
+日本語音声・声質の追加は `--voice`。Windowsのソース版はInstall-Windows.bat/Start-Windows.batを利用できます。
+スマートフォン用はソース版の `Start-Phone.bat`／`./start-phone.sh` を実行し、同じ信頼できるWi-Fiの接続URLを開きます。
 
 ## モデルと環境
 
@@ -76,5 +85,5 @@ v0.1.2では、生成専用の公開モデル4種類（SDXL、SSD-1B、PixArt Si
 音声生成にAudioLDM2 Large（非商用の効果音）とKokoro 82M（日本語読み上げ）を追加。
 OpenVoice V2で参照音声の声質特徴を取り込み、速度・高さの対応指示を保存して読み上げへ反映。
 動画投稿とサイト収集から音声を抽出し、音声・声質・動画学習へ利用できます。
-Windowsのインストール「3」またはLinux `./install.sh --gpu --voice` で追加音声ライブラリを導入します。
+Windows版の音声付きセットアップ、またはLinux `./install.sh --gpu --voice` で追加音声ライブラリを導入します。
 声質の取り込みは特徴抽出で、モデル全体の追加学習ではありません。再現度はモデルと録音によって変わります。

@@ -50,8 +50,9 @@ jobs:
           $env:PYTHONPATH = 'C:\Nonexistent external packages'
           foreach ($attempt in 1..5) {
             Remove-Item "$env:LOCALAPPDATA/DeeL Pyess/windows-smoke.json" -ErrorAction SilentlyContinue
-            $app = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList '--smoke-test' -PassThru
-            if (-not $app.WaitForExit(120000)) { Stop-Process -Id $app.Id -Force; throw 'App startup timed out' }
+            $arguments = if ($attempt -eq 1) { @('--smoke-test', '--smoke-setup') } else { @('--smoke-test') }
+            $app = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList $arguments -PassThru
+            if (-not $app.WaitForExit(240000)) { Stop-Process -Id $app.Id -Force; throw 'App startup timed out' }
             if ($app.ExitCode -ne 0) { throw "App failed: $($app.ExitCode)" }
             $result = Get-Content "$env:LOCALAPPDATA/DeeL Pyess/windows-smoke.json" | ConvertFrom-Json
             if (-not $result.passed) { throw 'Actual API smoke failed' }

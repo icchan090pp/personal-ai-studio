@@ -31,6 +31,7 @@ class Application:
         self.installer = None
         self.installing = False
         self.smoke = False
+        self.setup_count = 0
         self.command_path = self.data / f"setup-command-{os.getpid()}.json"
         self.command_path.unlink(missing_ok=True)
         self.events = queue.Queue()
@@ -232,16 +233,16 @@ class Application:
                 self.status.set("起動しました。ブラウザで画像の投稿・学習コースを使えます。")
                 if value:
                     webbrowser.open(self.url)
-                if not self.smoke:
-                    self.diagnose()
+                self.diagnose()
             elif event == "hardware":
                 devices = " / ".join(value.get("adapters", [])) or "GPU名を取得できませんでした"
                 self.hardware.set(devices + "\n" + value["label"] + "\n" + value["message"])
             elif event == "installed":
+                self.setup_count += 1
                 for button in self.buttons:
                     button.configure(state="normal")
                 self.status.set("追加機能の準備ができました。再起動しています…")
-                self.start()
+                self.start(browser=not self.smoke)
             else:
                 for button in self.buttons:
                     button.configure(state="normal")
@@ -277,6 +278,7 @@ class Application:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", action="store_true")
+    parser.add_argument("--smoke-setup", action="store_true")
     args = parser.parse_args()
     home = (
         Path(sys.executable).parent
@@ -289,12 +291,20 @@ def main():
     app.start(browser=not args.smoke_test)
     if args.smoke_test:
         # Exercise the same GUI and server launch path as a real double-click.
-        deadline = time.monotonic() + 75
+        deadline = time.monotonic() + 180
 
-        outcome = {"passed": False}
+        outcome = {"passed": False, "requested_setup": False}
 
         def check():
-            if app.status.get().startswith("起動しました"):
+            if args.smoke_setup and app.ready and not outcome["requested_setup"]:
+                outcome["requested_setup"] = True
+                app.backend.set("CPU互換モード")
+                app.buttons[1].invoke()
+            if (
+                app.ready
+                and not app.hardware.get().startswith("PCのGPUとAI機能")
+                and (not args.smoke_setup or app.setup_count == 1)
+            ):
                 try:
                     validate_installed_app(app)
                     root.update_idletasks()
@@ -342,6 +352,11 @@ def validate_installed_app(app):
         assert b"DeeL" in response.read()
     with urllib.request.urlopen(app.url + "/api/models", timeout=5) as response:
         assert {model["kind"] for model in json.load(response)} == {"image", "video"}
+    with urllib.request.urlopen(app.url + "/api/system", timeout=45) as response:
+        system = json.load(response)
+        assert system["version"] == "0.1.3" and system["desktop_setup"]
+        assert system["hardware"]["cpu_ready"] is True
+        assert "未接続" not in system["hardware"]["message"]
     request = urllib.request.Request(
         app.url + "/api/projects",
         data=json.dumps({"name": "Windows 起動試験", "trigger": "windowscheck"}).encode(),

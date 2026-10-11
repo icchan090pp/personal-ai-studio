@@ -130,5 +130,21 @@ def check_compat_generation(root, monkeypatch):
         assert output.read_bytes() == first
         detail = json.loads((output.parent / "execution.json").read_text())
         assert detail["backend"] == "cpu" and detail["fallback_reason"]
+        attempts = []
+
+        def reject_cuda(*args, **kwargs):
+            attempts.append(kwargs.get("device"))
+            if kwargs.get("device") == "cuda":
+                raise RuntimeError("CUDA out of memory")
+            return actual_generate(*args, **kwargs, size=32)
+
+        patch.setattr(compat, "generate", reject_cuda)
+        patch.setattr(
+            hardware, "inspect_system", lambda: {"cuda_ready": True, "directml": {"ready": False}}
+        )
+        compat.execute(folder, "tiny")
+        assert attempts == ["cuda", "cpu"]
+        detail = json.loads((output.parent / "execution.json").read_text())
+        assert detail["backend"] == "cpu" and "CUDA" in detail["fallback_reason"]
         with sqlite3.connect(database) as db:
             assert db.execute("SELECT progress FROM jobs").fetchone()[0] == 99

@@ -59,6 +59,7 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#hardware-summary")).to_contain_text("CPU")
             expect(page.locator("#setup-runtime")).to_be_disabled()
             expect(page.locator("#setup-backend option")).to_have_count(4)
+            page.screenshot(path=str(screenshots / f"hardware-{viewport['width']}.png"))
             page.locator("#close-hardware").click()
             expect(page.locator("#public-model")).to_have_value("tiny")
             page.get_by_role("button", name="＋ 新しいモデル").click()
