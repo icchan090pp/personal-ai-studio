@@ -1,5 +1,5 @@
 {
-  "version": "v0.1.2",
+  "version": "v0.1.3",
   "unique_cases": 100,
   "consecutive_runs": 5,
   "total_executions": 500,
@@ -10,9 +10,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 35.666,
-      "timestamp": "2026-10-11T19:29:20.896947+00:00",
-      "report_sha256": "973c8167d15207887f13dbceea1893d08110b44eb26656f18924373ded66f86b"
+      "seconds": 42.388,
+      "timestamp": "2026-10-11T20:27:11.446582+00:00",
+      "report_sha256": "61bd586338a168a05dd6a3eeb5f507e79c04129026a907eafadfab531dcff565"
     },
     {
       "run": 2,
@@ -20,9 +20,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.182,
-      "timestamp": "2026-10-11T19:30:01.349845+00:00",
-      "report_sha256": "5ead3e2b56d40f043464e51a3e7ce032fd12b60f5e5e96e031ef4d9050a7af4f"
+      "seconds": 34.528,
+      "timestamp": "2026-10-11T20:27:58.209782+00:00",
+      "report_sha256": "dd0e2662234b2ca26094a0e9d5cc77e0c5b7ea7a74155502577d475f388c6611"
     },
     {
       "run": 3,
@@ -30,9 +30,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.595,
-      "timestamp": "2026-10-11T19:30:39.917572+00:00",
-      "report_sha256": "a095f139a85cb49eea0ff9162e939682301fe91cfa3230b0202c881161f8aa10"
+      "seconds": 36.276,
+      "timestamp": "2026-10-11T20:28:37.244333+00:00",
+      "report_sha256": "b934804be6362d52ad0713e0528b20113757d2c03080d6e297a8153d9aca9d36"
     },
     {
       "run": 4,
@@ -40,9 +40,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 35.609,
-      "timestamp": "2026-10-11T19:31:19.137287+00:00",
-      "report_sha256": "699e96947fdb2c0ca1d03d91b2409e7e00e1b564e0c001bf9cb7abee94622f4a"
+      "seconds": 35.36,
+      "timestamp": "2026-10-11T20:29:18.475361+00:00",
+      "report_sha256": "fa26c8bbd8e6ac193f87ea20de37f345b70a31400ae8825e5afe9637682217a7"
     },
     {
       "run": 5,
@@ -50,19 +50,19 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 36.06,
-      "timestamp": "2026-10-11T19:31:59.215704+00:00",
-      "report_sha256": "6d200a768d565e9ddc058baf7585b10c79a60d4376d472a968e49400a68935c0"
+      "seconds": 35.72,
+      "timestamp": "2026-10-11T20:29:58.340782+00:00",
+      "report_sha256": "346b822a2d88b1407a6e32b5ac3247f6e50434336df7ac5a7e6f1326524bfbc4"
     }
   ],
   "additional_manual_checks": [
-    "actual Kokoro Japanese synthesis on CPU",
-    "actual OpenVoice reference extraction, conversion and pitch control on CPU",
-    "real app subprocess workers: WAV generation, upload, voice profile, saved instructions, download",
-    "native audio playback and retained player during dataset refresh in desktop/mobile Chromium",
-    "compatible optional speech/voice installation and pip check",
-    "fresh Linux ZIP install/start/stop",
-    "paired LAN authenticated mobile browser",
-    "live Wikimedia Commons search"
+    "actual fixed Tiny-SD pretrained model CPU image generation",
+    "actual app HTTP API -> subprocess worker -> Tiny-SD 20 steps -> 1280x720 PNG download",
+    "desktop/mobile hardware dialog and setup controls in real Chromium",
+    "Windows EXE upgrade from v0.1.2 with unchanged user database hash",
+    "actual Windows CPU packages and isolated DirectML installation with separate Torch versions",
+    "native Windows setup button -> HTTP command -> package installation -> app restart",
+    "five native Windows launches/uploads/exits with no external Python in PATH",
+    "Windows uninstall retains user data"
   ]
 }
