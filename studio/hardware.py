@@ -12,6 +12,31 @@ from pathlib import Path
 DRIVER_URL = "https://www.nvidia.com/Download/index.aspx"
 
 
+def fallback_state(root):
+    try:
+        value = json.loads((Path(root) / "runtime-fallback.json").read_text(encoding="utf-8"))
+        return value if value.get("backend") in {"cuda", "directml"} else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def remember_fallback(root, backend, reason):
+    path = Path(root) / "runtime-fallback.json"
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"backend": backend, "reason": reason}, ensure_ascii=False), encoding="utf-8"
+    )
+    temporary.replace(path)
+
+
+def selected_backend(root):
+    try:
+        value = json.loads((Path(root) / "runtime-choice.json").read_text(encoding="utf-8"))
+        return value if value in ("cpu", "cuda", "directml") else "auto"
+    except (OSError, ValueError):
+        return "auto"
+
+
 def run_json(command, timeout=20):
     result = subprocess.run(
         command,
@@ -20,6 +45,7 @@ def run_json(command, timeout=20):
         encoding="utf-8",
         errors="replace",
         timeout=timeout,
+        env={key: value for key, value in os.environ.items() if key.lower() != "psmodulepath"},
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if result.returncode:

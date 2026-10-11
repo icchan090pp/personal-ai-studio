@@ -31,11 +31,12 @@ script = (
 )
 subprocess.run(
     [
-        "powershell",
+        shutil.which("pwsh") or "powershell",
         "-NoProfile",
         "-EncodedCommand",
         base64.b64encode(script.encode("utf-16le")).decode(),
     ],
+    env={key: value for key, value in os.environ.items() if key.lower() != "psmodulepath"},
     check=True,
 )
 shutil.copytree(sys.base_prefix, runtime, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))

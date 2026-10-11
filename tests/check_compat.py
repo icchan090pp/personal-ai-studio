@@ -33,12 +33,18 @@ def check_hardware_and_setup(root, monkeypatch):
             "--backend",
             "cpu",
         ],
-        env={**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"},
+        env={
+            **os.environ,
+            "PYTHONIOENCODING": "cp1252",
+            "PYTHONUTF8": "0",
+            "STUDIO_DATA_DIR": str(root / "cli-state"),
+        },
         capture_output=True,
         check=True,
     )
     assert "日本語の診断" in output.stdout.decode("utf-8")
     assert "セットアップ完了" in output.stdout.decode("utf-8")
+    assert hardware.selected_backend(root / "cli-state") == "cpu"
     for vendor in ("AMD Radeon (TM) Graphics", "Intel Iris Xe", "Unknown GPU"):
         assert describe([vendor], True, False, True, {"ready": False})["code"] == "cpu_ready"
         assert describe([vendor], False, False, False, {"ready": False})["code"] == "setup_required"
@@ -164,6 +170,9 @@ def check_compat_generation(root, monkeypatch):
         assert output.read_bytes() == first
         detail = json.loads((output.parent / "execution.json").read_text())
         assert detail["backend"] == "cpu" and detail["fallback_reason"]
+        compat.execute(folder, "tiny")
+        assert len(commands) == 1  # A known failing GPU is not retried on every image.
+        assert output.read_bytes() == first
         attempts = []
 
         def reject_cuda(*args, **kwargs):

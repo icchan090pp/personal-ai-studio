@@ -1,6 +1,7 @@
 """Install fixed CPU/CUDA packages and an isolated optional DirectML runtime."""
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -93,6 +94,10 @@ def main():
                     f"DirectMLの準備に失敗したためCPU機能を使用します。再試行できます: {exc}",
                     flush=True,
                 )
+    data = Path(os.environ.get("STUDIO_DATA_DIR", str(root / "data")))
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "runtime-choice.json").write_text(json.dumps(backend), encoding="utf-8")
+    (data / "runtime-fallback.json").unlink(missing_ok=True)
     inspect_system.cache_clear()
     print(inspect_system()["message"], flush=True)
     print("セットアップ完了。", flush=True)

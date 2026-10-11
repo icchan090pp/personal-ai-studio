@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field, field_validator
 from studio.audio_models import AUDIO_MODELS
 from studio.collection import collect, public_address
 from studio.curriculum import MODULES
-from studio.hardware import inspect_system
+from studio.hardware import fallback_state, inspect_system, selected_backend
 from studio.presets import LEVELS
 from studio.public_models import PUBLIC_MODELS, catalog
 from studio.updates import CURRENT_VERSION, check_update
@@ -342,7 +342,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     def system():
         return {
             "version": CURRENT_VERSION,
-            "hardware": inspect_system(),
+            "hardware": hardware_status(),
             "desktop_setup": bool(os.environ.get("STUDIO_DESKTOP_COMMAND")),
             "gpu_ready": gpu_available(),
             "speech_ready": bool(importlib.util.find_spec("kokoro")),
@@ -357,7 +357,25 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     def hardware(refresh: bool = False):
         if refresh:
             inspect_system.cache_clear()
-        return inspect_system()
+            (root / "runtime-fallback.json").unlink(missing_ok=True)
+        return hardware_status()
+
+    def hardware_status():
+        info = dict(inspect_system())
+        info["selected_backend"] = selected_backend(root)
+        if info["selected_backend"] == "cpu":
+            info["label"] = "CPU互換モード（選択済み）"
+            info["message"] = (
+                "軽量画像はCPUを優先します。GPUへ切り替える場合は実行環境を変更してセットアップしてください。 "
+                + info["message"]
+            )
+        state = fallback_state(root)
+        if state:
+            info["compat_cpu_preferred"] = True
+            info["message"] += (
+                " 前回のGPU処理でエラーがあったため、軽量画像はCPUを優先します。『再診断する』でGPUを再試行できます。"
+            )
+        return info
 
     class SetupInput(BaseModel):
         backend: Literal["auto", "cpu", "cuda", "directml"] = "auto"

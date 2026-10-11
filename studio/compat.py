@@ -91,13 +91,30 @@ def execute(root, job_id, directml_model=None, device_index=0):
 
     backend = "directml" if directml_model else "cpu"
     if not directml_model:
-        from studio.hardware import inspect_system
+        from studio.hardware import (
+            fallback_state,
+            inspect_system,
+            remember_fallback,
+            selected_backend,
+        )
 
         info = inspect_system()
+        previous = fallback_state(root)
+        selected = selected_backend(root)
         dml_python = os.environ.get("STUDIO_DML_PYTHON")
-        if info.get("cuda_ready"):
+        if (
+            info.get("cuda_ready")
+            and previous.get("backend") != "cuda"
+            and selected in ("auto", "cuda")
+        ):
             backend = "cuda"
-        elif dml_python and info["directml"].get("ready"):
+        elif (
+            dml_python
+            and info["directml"].get("ready")
+            and previous.get("backend") != "directml"
+            and not info.get("cuda_ready")
+            and selected in ("auto", "directml")
+        ):
             model = prepare_safe_model(root / "models/tiny-sd-safetensors")
             result = subprocess.run(
                 [
@@ -121,7 +138,12 @@ def execute(root, job_id, directml_model=None, device_index=0):
             config["fallback_reason"] = (
                 "DirectMLで非対応の演算・メモリ不足などが発生。CPUで生成しました。"
             )
+            remember_fallback(root, "directml", config["fallback_reason"])
             progress(0)
+        elif previous:
+            config["fallback_reason"] = (
+                "前回のGPUエラーを記録し、CPUを優先して生成しました。再診断でGPUを再試行できます。"
+            )
     try:
         generate(
             config,
@@ -136,6 +158,7 @@ def execute(root, job_id, directml_model=None, device_index=0):
             raise
         backend = "cpu"
         config["fallback_reason"] = "CUDAの演算・メモリ不足などが発生。CPUで生成しました。"
+        remember_fallback(root, "cuda", config["fallback_reason"])
         progress(0)
         generate(config, folder / "output.png", progress, device="cpu")
     (folder / "execution.json").write_text(
