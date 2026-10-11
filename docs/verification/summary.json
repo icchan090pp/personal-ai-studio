@@ -1,5 +1,5 @@
 {
-  "version": "v0.1.1",
+  "version": "v0.1.2",
   "unique_cases": 100,
   "consecutive_runs": 5,
   "total_executions": 500,
@@ -10,9 +10,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 35.432,
-      "timestamp": "2026-10-11T19:01:40.774243+00:00",
-      "report_sha256": "f76b3d50080a18bf36c30e41064f05ac5ccc43670da5f7491905c112e0a9128c"
+      "seconds": 35.666,
+      "timestamp": "2026-10-11T19:29:20.896947+00:00",
+      "report_sha256": "973c8167d15207887f13dbceea1893d08110b44eb26656f18924373ded66f86b"
     },
     {
       "run": 2,
@@ -20,9 +20,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.224,
-      "timestamp": "2026-10-11T19:02:20.805660+00:00",
-      "report_sha256": "692f577b1303a367db144a9f73c9bda92673d6a4d68e65a6684c8ec91efce693"
+      "seconds": 34.182,
+      "timestamp": "2026-10-11T19:30:01.349845+00:00",
+      "report_sha256": "5ead3e2b56d40f043464e51a3e7ce032fd12b60f5e5e96e031ef4d9050a7af4f"
     },
     {
       "run": 3,
@@ -30,9 +30,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.793,
-      "timestamp": "2026-10-11T19:02:59.452468+00:00",
-      "report_sha256": "23eaaeddd9fa087bd570c32a5ea81f0ec56121a539f40af9e0f2419f24047eca"
+      "seconds": 34.595,
+      "timestamp": "2026-10-11T19:30:39.917572+00:00",
+      "report_sha256": "a095f139a85cb49eea0ff9162e939682301fe91cfa3230b0202c881161f8aa10"
     },
     {
       "run": 4,
@@ -40,9 +40,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.402,
-      "timestamp": "2026-10-11T19:03:38.827496+00:00",
-      "report_sha256": "09bd4875a4f31a8a7cf3eef4cbb85b69cfe1f5613e9dc2ccc979d93456b45748"
+      "seconds": 35.609,
+      "timestamp": "2026-10-11T19:31:19.137287+00:00",
+      "report_sha256": "699e96947fdb2c0ca1d03d91b2409e7e00e1b564e0c001bf9cb7abee94622f4a"
     },
     {
       "run": 5,
@@ -50,9 +50,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.324,
-      "timestamp": "2026-10-11T19:04:17.703395+00:00",
-      "report_sha256": "33b1b61885f8104d649eb2df973a998e9b93a7d0395f27d02efbb4060e9388c0"
+      "seconds": 36.06,
+      "timestamp": "2026-10-11T19:31:59.215704+00:00",
+      "report_sha256": "6d200a768d565e9ddc058baf7585b10c79a60d4376d472a968e49400a68935c0"
     }
   ],
   "additional_manual_checks": [

@@ -25,6 +25,10 @@ jobs:
           if (-not (Test-Path "$env:APPDATA/Microsoft/Windows/Start Menu/Programs/DeeL Pyess/DeeL Pyess.lnk")) { throw 'Start menu shortcut missing' }
           & "$destination/runtime/python.exe" -m pip check
           if ($LASTEXITCODE -ne 0) { throw 'Bundled dependencies invalid' }
+          # Prove launching does not depend on a preinstalled Python in PATH.
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $env:PYTHONHOME = 'C:\Nonexistent external Python'
+          $env:PYTHONPATH = 'C:\Nonexistent external packages'
           foreach ($attempt in 1..5) {
             Remove-Item "$env:LOCALAPPDATA/DeeL Pyess/windows-smoke.json" -ErrorAction SilentlyContinue
             $app = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList '--smoke-test' -PassThru

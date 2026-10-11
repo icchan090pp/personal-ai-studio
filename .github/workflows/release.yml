@@ -9,8 +9,10 @@ permissions:
 jobs:
   verify_release:
     uses: ./.github/workflows/verify.yml
+  verify_windows:
+    uses: ./.github/workflows/windows.yml
   release:
-    needs: verify_release
+    needs: [verify_release, verify_windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,12 +26,21 @@ jobs:
           done
       - name: Build source installer
         run: python scripts/package-release.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: artifacts/windows
+      - name: Include Windows installer and checksum
+        run: |
+          find artifacts/windows -name 'DeeL-Pyess-Setup-*.exe' -exec cp {} artifacts/release/ \;
+          cd artifacts/release
+          sha256sum DeeL-Pyess-Setup-*.exe >> SHA256SUMS.txt
       - name: Publish preview and attach installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v0.1.1 >/dev/null 2>&1; then
-            gh release upload v0.1.1 artifacts/release/DeeL-Pyess-v0.1.1.zip artifacts/release/SHA256SUMS.txt --clobber
+          if gh release view v0.1.2 >/dev/null 2>&1; then
+            gh release upload v0.1.2 artifacts/release/DeeL-Pyess-v0.1.2.zip artifacts/release/DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe artifacts/release/SHA256SUMS.txt --clobber
           else
-            gh release create v0.1.1 artifacts/release/DeeL-Pyess-v0.1.1.zip artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.1 — Preview' --prerelease --notes-file docs/release-notes.md
+            gh release create v0.1.2 artifacts/release/DeeL-Pyess-v0.1.2.zip artifacts/release/DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.2 — Windows application' --prerelease --notes-file docs/release-notes.md
           fi
