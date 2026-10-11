@@ -1,0 +1,186 @@
+import json
+import os
+import shutil
+import socket
+import sqlite3
+import threading
+import wave
+from pathlib import Path
+
+import pytest
+import uvicorn
+from fastapi.staticfiles import StaticFiles
+from playwright.sync_api import expect, sync_playwright
+
+from studio.app import create_app
+from tests.test_studio import png
+
+
+@pytest.mark.parametrize(
+    "viewport", [{"width": 1440, "height": 1000}, {"width": 390, "height": 844}]
+)
+def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
+    repository = Path(__file__).resolve().parents[1]
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(repository / ".cache/ms-playwright"))
+    app = create_app(tmp_path / "data", run_workers=False)
+    app.mount("/website", StaticFiles(directory=repository / "website", html=True), name="website")
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    thread = threading.Thread(target=lambda: server.run(sockets=[sock]), daemon=True)
+    thread.start()
+    image = tmp_path / "sample.png"
+    image.write_bytes(png())
+    sound = tmp_path / "sound.wav"
+    with wave.open(str(sound), "wb") as recording:
+        recording.setnchannels(1)
+        recording.setsampwidth(2)
+        recording.setframerate(16000)
+        recording.writeframes(bytes(32000))
+    screenshots = (
+        repository / "artifacts/browser" / f"run-{os.getenv('CLOUDSPACE_CHECK_RUN', 'manual')}"
+    )
+    screenshots.mkdir(parents=True, exist_ok=True)
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(executable_path=shutil.which("chromium"))
+            page = browser.new_page(viewport=viewport)
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+            page.on("requestfailed", lambda req: errors.append(req.url))
+            page.on("response", lambda res: errors.append(res.url) if res.status >= 400 else None)
+            page.goto(f"http://127.0.0.1:{port}/")
+            expect(page.get_by_role("heading", name="あなたの世界を、 モデルに。")).to_be_visible()
+            expect(page.locator("#gpu")).to_contain_text("GPU")
+            page.get_by_role("button", name="＋ 新しいモデル").click()
+            page.get_by_label("モデル名").fill("ブラウザテスト")
+            page.get_by_label("トリガーワード", exact=True).fill("browserstyle")
+            page.get_by_role("button", name="モデルを作成する ↗").click()
+            expect(page.locator("#projects")).to_contain_text("ブラウザテスト")
+            page.locator("#upload").set_input_files(str(image))
+            expect(page.locator("#image-count")).to_have_text("1 / 100枚")
+            expect(page.locator("#images img")).to_be_visible()
+            page.get_by_label("画像の説明", exact=True).fill("a drawing of browserstyle")
+            page.get_by_label("画像の説明", exact=True).press("Tab")
+            expect(page.get_by_role("status")).to_have_text("画像の説明を保存しました。")
+            page.reload()
+            expect(page.get_by_label("画像の説明", exact=True)).to_have_value(
+                "a drawing of browserstyle"
+            )
+            page.locator("#training-mode").select_option("style")
+            expect(page.locator("#mode-help")).to_contain_text("画風")
+            expect(page.locator("#steps")).to_have_value("800")
+            expect(page.locator("#training-group")).to_contain_text("default")
+            expect(page.locator("#folder-upload")).to_have_attribute("webkitdirectory", "")
+            page.locator("#model-level").select_option("excellent")
+            expect(page.locator("#steps")).to_have_value("2000")
+            page.locator("#training-instruction").fill("watercolor texture")
+            page.locator("#send-training-chat").click()
+            expect(page.locator("#training-chat-history")).to_contain_text("watercolor texture")
+            page.get_by_text("サイト・検索から自動収集する", exact=True).click()
+            page.locator("#collection-provider").select_option("commons")
+            expect(page.locator("#collection-url")).to_be_disabled()
+            page.locator("#collection-query").fill("watercolor")
+            page.get_by_text("動画・音声の学習データを追加", exact=True).click()
+            page.locator("#media-kind").select_option("audio")
+            page.locator("#media-upload").set_input_files([str(sound)] * 3)
+            expect(page.locator("#media-count")).to_have_text("3 / 30件")
+            expect(page.locator("#media-list audio")).to_have_count(3)
+            page.locator("#training-target").select_option("audio")
+            expect(page.locator("#mode-help")).to_contain_text("環境音")
+            page.locator("#training-target").select_option("video")
+            expect(page.locator("#mode-help")).to_contain_text("CogVideoX")
+            page.locator("#training-target").select_option("image")
+            page.get_by_role("button", name="AIルールの設定").click()
+            expect(page.locator("#rules-prompt")).to_have_value("")
+            page.get_by_label("共通ルール・表現").fill("watercolor, soft colors")
+            page.get_by_label("除外する要素", exact=True).last.fill("blur")
+            page.get_by_role("button", name="設定を保存 ↗").click()
+            page.get_by_role("button", name="AIルールの設定").click()
+            expect(page.locator("#rules-prompt")).to_have_value("watercolor, soft colors")
+            page.get_by_role("button", name="ルールをリセット").click()
+            expect(page.locator("#rules-prompt")).to_have_value("")
+            page.get_by_role("button", name="設定を閉じる").click()
+            page.get_by_role("button", name="AI開発コース").click()
+            expect(page.locator(".course-module")).to_have_count(8)
+            page.locator(".course-module input[type=checkbox]").first.check()
+            expect(page.locator("#course-count")).to_contain_text("1 / 8")
+            page.locator(".course-module textarea").first.fill("My first experiment")
+            page.locator(".course-module textarea").first.press("Tab")
+            expect(page.get_by_role("status")).to_have_text(
+                "コースの進捗・実験ノートを保存しました。"
+            )
+            pid = page.locator("#projects").input_value()
+            with sqlite3.connect(tmp_path / "data/studio.sqlite3") as db:
+                db.execute(
+                    "INSERT INTO jobs(id,project_id,kind,status,config) VALUES('chart-test',?,'train','failed',?)",
+                    (
+                        pid,
+                        json.dumps(
+                            {"steps": 500, "rank": 8, "learning_rate": 0.0001, "mode": "supervised"}
+                        ),
+                    ),
+                )
+                db.executemany(
+                    "INSERT INTO training_metrics VALUES(?,?,?,?,?,?)",
+                    [
+                        ("chart-test", 1, 1.2, 0.0001, 0.8, 3.5),
+                        ("chart-test", 10, 0.7, 0.0001, 0.5, 3.6),
+                    ],
+                )
+            expect(page.locator(".metric-bar")).to_have_count(2, timeout=10000)
+            page.locator("#metric-type").select_option("lora_norm")
+            expect(page.locator("#metric-chart")).to_have_attribute(
+                "aria-label", "学習重みの大きさ（L2）の棒グラフ。ステップ1: 3.50、ステップ10: 3.60"
+            )
+            page.get_by_role("button", name="作品をつくる").click()
+            expect(page.locator("#generation-form")).to_be_visible()
+            page.locator("#output-resolution").select_option("custom")
+            expect(page.locator("#output-resolution")).to_have_value("custom")
+            page.locator("#output-resolution").select_option("4k")
+            expect(page.locator("#output-resolution")).to_have_value("4k")
+            page.get_by_label("動画", exact=True).check()
+            expect(page.locator("#source-label")).to_be_visible()
+            page.get_by_role("button", name="ギャラリー").click()
+            expect(page.locator("#empty-gallery")).to_be_visible()
+            page.get_by_role("button", name="モデルを育てる").click()
+            sample_folder = tmp_path / "dataset"
+            sample_folder.mkdir()
+            (sample_folder / "folder-image.png").write_bytes(png("blue"))
+            page.locator("#folder-upload").set_input_files(str(sample_folder))
+            expect(page.locator("#image-count")).to_have_text("2 / 100枚")
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert page.locator("#images img").first.evaluate(
+                "img => img.complete && img.naturalWidth > 0"
+            )
+            assert not errors, errors
+            page.screenshot(
+                path=str(screenshots / f"studio-{viewport['width']}.png"), full_page=True
+            )
+            page.goto(f"http://127.0.0.1:{port}/website/")
+            expect(
+                page.get_by_role("heading", name="自分のAIを、 つくるところから。")
+            ).to_be_visible()
+            page.locator('[data-os="linux"]').click()
+            expect(page.locator("#os-title")).to_contain_text("Linux")
+            expect(page.locator("#os-instructions")).to_contain_text("./install.sh --gpu")
+            page.locator('[data-os="windows"]').click()
+            expect(page.locator("#os-instructions")).to_contain_text("Install-Windows.bat")
+            assert page.locator('a[href$="DeeL-Pyess-v0.1.0.zip"]').count() >= 1
+            page.locator(".usage-screen img").scroll_into_view_if_needed()
+            expect(page.locator(".usage-screen img")).to_be_visible()
+            assert page.locator(".usage-screen img").evaluate(
+                "image=>image.complete && image.naturalWidth>0"
+            )
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert not errors, errors
+            page.screenshot(
+                path=str(screenshots / f"website-{viewport['width']}.png"), full_page=True
+            )
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        sock.close()

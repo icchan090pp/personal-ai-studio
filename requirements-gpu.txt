@@ -1,0 +1,11 @@
+-r requirements-app.txt
+torch==2.7.0
+torchvision==0.22.0
+diffusers==0.33.1
+transformers==4.51.3
+accelerate==1.6.0
+peft==0.15.2
+safetensors==0.5.3
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
+sentencepiece==0.2.0

@@ -3,3 +3,17 @@
 
 # Ada Library Information
 *.ali
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+node_modules/
+.cache/
+.env
+.env.*
+!.env.example
+.DS_Store
+/artifacts/
+/data/

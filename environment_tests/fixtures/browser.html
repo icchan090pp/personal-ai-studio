@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Cloud Service Space browser check</title>
+    <style>
+      body { margin: 16px; font: 16px system-ui, sans-serif; color: #202124; }
+      main { max-width: 720px; margin: auto; }
+      h1 { font-size: 24px; }
+      canvas { display: block; width: 100%; height: auto; margin-top: 16px; }
+      button { padding: 8px 16px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Cloud Service Space</h1>
+      <p id="version">Version 1</p>
+      <button id="update" type="button">Update</button>
+      <p id="status" role="status">Ready</p>
+      <canvas width="480" height="240" aria-label="Animated rendering check"></canvas>
+    </main>
+    <script>
+      const canvas = document.querySelector('canvas');
+      const context = canvas.getContext('2d');
+      let updated = false;
+      window.renderedFrames = 0;
+      document.querySelector('#update').addEventListener('click', () => {
+        updated = true;
+        document.querySelector('#status').textContent = 'Updated';
+      });
+      function render() {
+        window.renderedFrames += 1;
+        context.fillStyle = '#f1f3f5';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = updated ? '#087f5b' : '#e03131';
+        context.fillRect((window.renderedFrames * 3) % 400, 80, 64, 64);
+        requestAnimationFrame(render);
+      }
+      render();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+{
+  "unique_cases": 100,
+  "consecutive_runs": 5,
+  "total_executions": 500,
+  "runs": [
+    {
+      "run": 1,
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 31.227,
+      "timestamp": "2026-10-11T18:07:31.636728+00:00",
+      "report_sha256": "e62265ee7292bd9440f56d2af60d0ead8225fb0bb3365536924bf36bb3998394"
+    },
+    {
+      "run": 2,
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 31.331,
+      "timestamp": "2026-10-11T18:08:07.147918+00:00",
+      "report_sha256": "c6a204a81aef2ef6fa09f6357a291365e0d68fb5855bfa056b4ac119f7c6f501"
+    },
+    {
+      "run": 3,
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 30.985,
+      "timestamp": "2026-10-11T18:08:42.581642+00:00",
+      "report_sha256": "2da738b87f38061decd58f992414bee1104cf7a2197ca82f7538a820218c173b"
+    },
+    {
+      "run": 4,
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 31.712,
+      "timestamp": "2026-10-11T18:09:17.764473+00:00",
+      "report_sha256": "56a236000dfcf6d9e41864880b123b9b60b7ef905eee00e76b306bcc53b34a23"
+    },
+    {
+      "run": 5,
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 31.343,
+      "timestamp": "2026-10-11T18:09:54.017045+00:00",
+      "report_sha256": "0b5e2af6aed79ecc8bd62d408d8a09a7c38a1dd5a2f650c3f2224b492dcb7ecc"
+    }
+  ],
+  "additional_manual_checks": [
+    "fresh Linux ZIP install/start/stop",
+    "paired LAN authenticated mobile browser",
+    "live Wikimedia Commons search"
+  ]
+}
