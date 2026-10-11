@@ -1,0 +1,32 @@
+name: Publish DeeL Pyess Preview
+on:
+  push:
+    branches: [feat/personal-ai-studio]
+    paths: [.github/workflows/release.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate all five recorded product runs
+        run: |
+          for report in docs/verification/run-{1..5}.xml; do
+            python scripts/check-results.py "$report"
+          done
+      - name: Build source installer
+        run: python scripts/package-release.py
+      - name: Publish preview and attach installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view v0.1.0 >/dev/null 2>&1; then
+            gh release upload v0.1.0 artifacts/release/DeeL-Pyess-v0.1.0.zip artifacts/release/SHA256SUMS.txt --clobber
+          else
+            gh release create v0.1.0 artifacts/release/DeeL-Pyess-v0.1.0.zip artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.0 — Preview' --prerelease --notes-file docs/release-notes.md
+          fi
