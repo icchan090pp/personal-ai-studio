@@ -25,7 +25,11 @@ def main():
     if not 1 <= args.port <= 65535:
         raise SystemExit("Choose a port between 1 and 65535")
     root = Path(__file__).resolve().parent
-    python = root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    python = (
+        Path(os.environ["STUDIO_PYTHON"])
+        if os.environ.get("STUDIO_PYTHON")
+        else (root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+    )
     if not python.exists():
         raise SystemExit("Run Install-Windows.bat or ./install.sh first")
     with socket.socket() as probe:

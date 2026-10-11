@@ -1,0 +1,47 @@
+name: Windows executable
+on: [push, pull_request, workflow_dispatch, workflow_call]
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install application and build tools
+        run: |
+          python -m pip install -r requirements-app.txt pyinstaller==6.13.0
+          python -m pip check
+      - name: Build native Windows installer
+        run: python scripts/build-windows.py
+      - name: Install, launch and uninstall the actual EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $destination = Join-Path $env:RUNNER_TEMP 'DeeL 試験 with spaces'
+          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe'
+          $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -PassThru -Wait
+          if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
+          if (-not (Test-Path "$env:APPDATA/Microsoft/Windows/Start Menu/Programs/DeeL Pyess/DeeL Pyess.lnk")) { throw 'Start menu shortcut missing' }
+          & "$destination/runtime/python.exe" -m pip check
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled dependencies invalid' }
+          foreach ($attempt in 1..5) {
+            Remove-Item "$env:LOCALAPPDATA/DeeL Pyess/windows-smoke.json" -ErrorAction SilentlyContinue
+            $app = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList '--smoke-test' -PassThru
+            if (-not $app.WaitForExit(120000)) { Stop-Process -Id $app.Id -Force; throw 'App startup timed out' }
+            if ($app.ExitCode -ne 0) { throw "App failed: $($app.ExitCode)" }
+            $result = Get-Content "$env:LOCALAPPDATA/DeeL Pyess/windows-smoke.json" | ConvertFrom-Json
+            if (-not $result.passed) { throw 'Actual API smoke failed' }
+            Copy-Item "$env:LOCALAPPDATA/DeeL Pyess/windows-smoke.json" "artifacts/release/windows-smoke-$attempt.json"
+          }
+          if (Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*$destination*launch.py*" -or $_.CommandLine -like "*$destination*studio.app:app*" }) { throw 'Server process leaked after exit' }
+          $uninstall = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -PassThru -Wait
+          if ($uninstall.ExitCode -ne 0 -or (Test-Path "$destination/DeeL Pyess.exe")) { throw 'Uninstall failed' }
+          if (-not (Test-Path "$env:LOCALAPPDATA/DeeL Pyess/data")) { throw 'Uninstall deleted user data' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-installer
+          path: |
+            artifacts/release/
+            ~/AppData/Local/DeeL Pyess/startup.log
