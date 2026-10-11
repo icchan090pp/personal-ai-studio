@@ -307,7 +307,7 @@ class Application:
                 self.ready = True
                 for button in self.buttons:
                     button.configure(state="normal")
-                self.status.set("起動しました。ブラウザで画像の投稿・学習コースを使えます。")
+                self.status.set("起動しました。専用画面で画像の投稿・学習・生成を操作できます。")
                 if value:
                     self.open_app()
                 self.diagnose()
