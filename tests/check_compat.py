@@ -1,8 +1,10 @@
 """Additional assertions inside the existing hardware and numerical product cases."""
 
 import json
+import os
 import sqlite3
 import subprocess
+import sys
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -17,6 +19,23 @@ def check_hardware_and_setup(root, monkeypatch):
     from studio import app as module
     from studio import hardware
 
+    output = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from studio import setup_runtime as s; "
+            "s.installation_plan=lambda *a: []; "
+            "s.inspect_system=lambda: {'message':'日本語の診断'}; "
+            "s.inspect_system.cache_clear=lambda: None; s.main()",
+            "--backend",
+            "cpu",
+        ],
+        env={**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"},
+        capture_output=True,
+        check=True,
+    )
+    assert "日本語の診断" in output.stdout.decode("utf-8")
+    assert "セットアップ完了" in output.stdout.decode("utf-8")
     for vendor in ("AMD Radeon (TM) Graphics", "Intel Iris Xe", "Unknown GPU"):
         assert describe([vendor], True, False, True, {"ready": False})["code"] == "cpu_ready"
         assert describe([vendor], False, False, False, {"ready": False})["code"] == "setup_required"

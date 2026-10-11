@@ -33,6 +33,13 @@ def installation_plan(root, backend, voice=False):
 
 
 def main():
+    # Redirected output on English Windows defaults to cp1252. Keep Japanese
+    # diagnostics and child installer logs usable regardless of system locale.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+    os.environ["PYTHONUTF8"] = "1"
+    os.environ["PYTHONIOENCODING"] = "utf-8"
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend", choices=["auto", "cpu", "cuda", "directml"], default="auto")
     parser.add_argument("--voice", action="store_true")
