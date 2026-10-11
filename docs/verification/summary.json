@@ -1,5 +1,5 @@
 {
-  "version": "v0.1.3",
+  "version": "v0.1.4",
   "unique_cases": 100,
   "consecutive_runs": 5,
   "total_executions": 500,
@@ -10,9 +10,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 42.388,
-      "timestamp": "2026-10-11T20:27:11.446582+00:00",
-      "report_sha256": "61bd586338a168a05dd6a3eeb5f507e79c04129026a907eafadfab531dcff565"
+      "seconds": 38.118,
+      "timestamp": "2026-10-11T20:56:33.451493+00:00",
+      "report_sha256": "408001d1bbf9b6588c0df272304bcbcc7877d35efe1cff2014f1a47a8c9544f2"
     },
     {
       "run": 2,
@@ -20,9 +20,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 34.528,
-      "timestamp": "2026-10-11T20:27:58.209782+00:00",
-      "report_sha256": "dd0e2662234b2ca26094a0e9d5cc77e0c5b7ea7a74155502577d475f388c6611"
+      "seconds": 36.112,
+      "timestamp": "2026-10-11T20:57:16.171296+00:00",
+      "report_sha256": "3a9d506cc9c38428f2feb594a116964aaf221ca8e7605bde54902a4035ac3a39"
     },
     {
       "run": 3,
@@ -30,9 +30,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 36.276,
-      "timestamp": "2026-10-11T20:28:37.244333+00:00",
-      "report_sha256": "b934804be6362d52ad0713e0528b20113757d2c03080d6e297a8153d9aca9d36"
+      "seconds": 36.2,
+      "timestamp": "2026-10-11T20:57:56.959418+00:00",
+      "report_sha256": "4b4d956f13e7c736b6e360d356a726b560e1cb14dcf3270fa206b87c827c8168"
     },
     {
       "run": 4,
@@ -40,9 +40,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 35.36,
-      "timestamp": "2026-10-11T20:29:18.475361+00:00",
-      "report_sha256": "fa26c8bbd8e6ac193f87ea20de37f345b70a31400ae8825e5afe9637682217a7"
+      "seconds": 37.232,
+      "timestamp": "2026-10-11T20:58:37.784151+00:00",
+      "report_sha256": "a762ef2f0fc2de7341374de97ce4b89a6f27c23ff12e94e71c00e3439abf1b6c"
     },
     {
       "run": 5,
@@ -50,9 +50,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 35.72,
-      "timestamp": "2026-10-11T20:29:58.340782+00:00",
-      "report_sha256": "346b822a2d88b1407a6e32b5ac3247f6e50434336df7ac5a7e6f1326524bfbc4"
+      "seconds": 36.182,
+      "timestamp": "2026-10-11T20:59:19.428084+00:00",
+      "report_sha256": "dd2e0fb53fb169fa61e2b4f1da743f682beafe85d352b119dd1b11e09a0c54c2"
     }
   ],
   "additional_manual_checks": [
@@ -63,6 +63,10 @@
     "actual Windows CPU packages and isolated DirectML installation with separate Torch versions",
     "native Windows setup button -> HTTP command -> package installation -> app restart",
     "five native Windows launches/uploads/exits with no external Python in PATH",
-    "Windows uninstall retains user data"
+    "Windows uninstall retains user data",
+    "fresh native Windows installation and real WebView2 DOM navigation",
+    "official GitHub update metadata and full v0.1.3 EXE download with SHA256 verification",
+    "actual Chromium in-app update check against official GitHub releases",
+    "memory guidance at 4GB, 8GB, 16GB and unknown capacity; persistent CPU choice and GPU failure fallback"
   ]
 }
