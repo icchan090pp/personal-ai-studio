@@ -12,9 +12,10 @@ import threading
 import time
 import tkinter as tk
 import urllib.request
-import webbrowser
 from pathlib import Path
 from tkinter import messagebox
+
+from studio.updates import CURRENT_VERSION, check_update, download_update
 
 
 class Application:
@@ -27,10 +28,13 @@ class Application:
         self.log_path = self.data / "startup.log"
         self.log = self.log_path.open("a", encoding="utf-8")
         self.process = None
+        self.viewer = None
+        self.viewer_started = False
         self.ready = False
         self.installer = None
         self.installing = False
         self.smoke = False
+        self.smoke_basic = False
         self.setup_count = 0
         self.command_path = self.data / f"setup-command-{os.getpid()}.json"
         self.command_path.unlink(missing_ok=True)
@@ -52,7 +56,7 @@ class Application:
         # A user's Python configuration must not redirect the bundled interpreter.
         for key in ("PYTHONHOME", "PYTHONPATH"):
             self.env.pop(key, None)
-        root.title("DeeL Pyess 0.1.3")
+        root.title("DeeL Pyess " + CURRENT_VERSION)
         root.geometry("640x610")
         root.minsize(580, 610)
         root.configure(bg="#080d16")
@@ -82,10 +86,16 @@ class Application:
             ("AI機能 ＋ 日本語音声・声質機能をセットアップ", lambda: self.request_install(True)),
             ("PC環境を再診断", self.diagnose),
             (
-                "アプリの更新版をダウンロード",
-                lambda: webbrowser.open("https://deel-pyess.icchan.chatgpt.site/#download"),
+                "アップデートを確認・取得",
+                self.request_update,
             ),
             ("診断ログを開く", lambda: os.startfile(self.log_path)),
+            (
+                "専用画面の表示エンジンを修復",
+                lambda: subprocess.Popen(
+                    [str(self.home / "MicrosoftEdgeWebview2Setup.exe"), "/install"]
+                ),
+            ),
         ):
             button = tk.Button(root, text=text, command=command, width=46)
             button.pack(pady=4)
@@ -148,7 +158,20 @@ class Application:
 
     def open_app(self):
         if self.ready:
-            webbrowser.open(self.url)
+            if self.viewer and self.viewer.poll() is None:
+                return
+            self.viewer = self.spawn(
+                [
+                    "-m",
+                    "studio.desktop_view",
+                    "--url",
+                    self.url,
+                    "--storage",
+                    str(self.data / "webview"),
+                ]
+            )
+            self.viewer_started = True
+            self.root.withdraw()
         elif not self.installing and (not self.process or self.process.poll() is not None):
             self.status.set("アプリを再起動しています…")
             self.start()
@@ -173,6 +196,51 @@ class Application:
                 "DeeL Pyess",
                 "セットアップを開始できません。実行中の学習・生成を終了してください。\n" + str(exc),
             )
+
+    def request_update(self):
+        if self.installing:
+            return
+        try:
+            request = urllib.request.Request(
+                self.url + "/api/system/update",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                json.load(response)
+        except Exception as exc:
+            messagebox.showerror(
+                "DeeL Pyess",
+                "更新を開始できません。処理が完了してから再試行してください。\n" + str(exc),
+            )
+
+    def update(self):
+        if self.installing:
+            return
+        self.installing = True
+        self.root.deiconify()
+        self.status.set("最新版を確認しています…")
+
+        def work():
+            try:
+                release = check_update()
+                if not release["available"]:
+                    self.events.put(("update_current", release))
+                    return
+                path = download_update(
+                    release,
+                    self.data / "updates",
+                    lambda value: self.events.put(("update_progress", value)),
+                )
+                self.events.put(("update_downloaded", path))
+            except Exception as exc:
+                self.events.put(
+                    ("error", "更新を完了できません。現在のアプリは使用できます。\n" + str(exc))
+                )
+            finally:
+                self.installing = False
+
+        threading.Thread(target=work, daemon=True).start()
 
     def diagnose(self):
         def work():
@@ -199,6 +267,15 @@ class Application:
         if self.installing:
             return
         self.installing = True
+        self.root.deiconify()
+        if self.viewer and self.viewer.poll() is None:
+            self.viewer_started = False
+            subprocess.run(
+                ["taskkill", "/PID", str(self.viewer.pid), "/T", "/F"],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            self.viewer.wait(timeout=15)
         self.stop()
         for button in self.buttons[:3]:
             button.configure(state="disabled")
@@ -232,7 +309,7 @@ class Application:
                     button.configure(state="normal")
                 self.status.set("起動しました。ブラウザで画像の投稿・学習コースを使えます。")
                 if value:
-                    webbrowser.open(self.url)
+                    self.open_app()
                 self.diagnose()
             elif event == "hardware":
                 devices = " / ".join(value.get("adapters", [])) or "GPU名を取得できませんでした"
@@ -243,7 +320,39 @@ class Application:
                     button.configure(state="normal")
                 self.status.set("追加機能の準備ができました。再起動しています…")
                 self.start(browser=not self.smoke)
+            elif event == "update_progress":
+                self.status.set(f"更新版を取得しています… {value}%（現在のアプリは保持します）")
+            elif event == "update_current":
+                self.status.set("現在のバージョン " + CURRENT_VERSION + " は最新です。")
+            elif event == "update_downloaded":
+                self.root.deiconify()
+                self.status.set("更新版の検証が完了しました。")
+                if messagebox.askyesno(
+                    "DeeL Pyess の更新",
+                    "保存済みのデータを保持して更新します。アプリを終了してセットアップを開始しますか？",
+                ):
+                    # Check again: the user may have started work during download.
+                    try:
+                        request = urllib.request.Request(
+                            self.url + "/api/system/update",
+                            data=b"{}",
+                            headers={"Content-Type": "application/json"},
+                        )
+                        with urllib.request.urlopen(request, timeout=10) as response:
+                            json.load(response)
+                        self.command_path.unlink(missing_ok=True)
+                        subprocess.Popen(
+                            [str(value), f"/DIR={self.home}", "/NORESTART"], cwd=self.home
+                        )
+                        self.close()
+                        return
+                    except Exception as exc:
+                        self.status.set(
+                            "更新を開始できません。実行中の処理を終了して再試行してください。"
+                            + str(exc)
+                        )
             else:
+                self.root.deiconify()
                 for button in self.buttons:
                     button.configure(state="normal")
                 self.status.set(value)
@@ -252,10 +361,24 @@ class Application:
         if self.ready and self.process.poll() is not None:
             self.ready = False
             self.events.put(("error", "アプリが停止しました。診断ログをご確認ください。"))
+        if self.viewer_started and self.viewer and self.viewer.poll() is not None:
+            self.viewer_started = False
+            if self.viewer.returncode == 0:
+                if not self.installing:
+                    self.close()
+                    return
+                self.root.deiconify()
+            self.root.deiconify()
+            self.status.set(
+                "専用画面を起動できません。Microsoft Edge WebView2 Runtimeをインストールして再試行してください。"
+            )
         if self.ready and not self.installing and self.command_path.exists():
             try:
                 command = json.loads(self.command_path.read_text(encoding="utf-8"))
-                if command.get("backend") in {"auto", "cpu", "cuda", "directml"} and isinstance(
+                if command == {"action": "update"}:
+                    self.command_path.unlink()
+                    self.update()
+                elif command.get("backend") in {"auto", "cpu", "cuda", "directml"} and isinstance(
                     command.get("voice"), bool
                 ):
                     self.command_path.unlink()
@@ -269,6 +392,13 @@ class Application:
             messagebox.showinfo("DeeL Pyess", "追加機能のインストールが終わるまでお待ちください。")
             return
         self.closing = True
+        if self.viewer and self.viewer.poll() is None:
+            subprocess.run(
+                ["taskkill", "/PID", str(self.viewer.pid), "/T", "/F"],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            self.viewer.wait(timeout=15)
         self.stop()
         self.log.close()
         self.command_path.unlink(missing_ok=True)
@@ -279,6 +409,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--smoke-setup", action="store_true")
+    parser.add_argument("--smoke-basic", action="store_true")
     args = parser.parse_args()
     home = (
         Path(sys.executable).parent
@@ -288,6 +419,7 @@ def main():
     root = tk.Tk()
     app = Application(root, home)
     app.smoke = args.smoke_test
+    app.smoke_basic = args.smoke_basic
     app.start(browser=not args.smoke_test)
     if args.smoke_test:
         # Exercise the same GUI and server launch path as a real double-click.
@@ -354,8 +486,9 @@ def validate_installed_app(app):
         assert {model["kind"] for model in json.load(response)} == {"image", "video"}
     with urllib.request.urlopen(app.url + "/api/system", timeout=45) as response:
         system = json.load(response)
-        assert system["version"] == "0.1.3" and system["desktop_setup"]
-        assert system["hardware"]["cpu_ready"] is True
+        assert system["version"] == CURRENT_VERSION and system["desktop_setup"]
+        if not app.smoke_basic:
+            assert system["hardware"]["cpu_ready"] is True
         assert "未接続" not in system["hardware"]["message"]
     request = urllib.request.Request(
         app.url + "/api/projects",
@@ -386,6 +519,22 @@ def validate_installed_app(app):
     with urllib.request.urlopen(app.url + f"/api/projects/{project}/images", timeout=5) as response:
         assert len(json.load(response)) == 1
     assert (app.data / "data").is_dir()
+    report = app.data / "windows-webview.json"
+    report.unlink(missing_ok=True)
+    viewer = app.spawn(
+        [
+            "-m",
+            "studio.desktop_view",
+            "--url",
+            app.url,
+            "--storage",
+            str(app.data / "webview-test"),
+            "--smoke-report",
+            str(report),
+        ]
+    )
+    assert viewer.wait(timeout=60) == 0
+    assert json.loads(report.read_text(encoding="utf-8"))["passed"]
 
 
 if __name__ == "__main__":

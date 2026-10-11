@@ -1,0 +1,3 @@
+# Native Windows UI; the Python runtime and these packages ship inside the EXE.
+pywebview==5.4
+pythonnet==3.0.5

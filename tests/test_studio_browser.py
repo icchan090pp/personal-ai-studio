@@ -61,6 +61,20 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#setup-backend option")).to_have_count(4)
             page.screenshot(path=str(screenshots / f"hardware-{viewport['width']}.png"))
             page.locator("#close-hardware").click()
+            page.locator("#update-button").click()
+            expect(page.locator("#update-dialog")).to_be_visible()
+            expect(page.locator("#update-version")).to_contain_text("0.1.4")
+            page.route(
+                "**/api/system/update",
+                lambda route: route.fulfill(
+                    json={"current": "0.1.4", "latest": "0.1.5", "available": True}
+                ),
+            )
+            page.locator("#check-update").click()
+            expect(page.locator("#update-status")).to_contain_text("0.1.5")
+            expect(page.locator("#install-update")).to_be_disabled()
+            page.screenshot(path=str(screenshots / f"update-{viewport['width']}.png"))
+            page.locator("#close-update").click()
             expect(page.locator("#public-model")).to_have_value("tiny")
             page.get_by_role("button", name="＋ 新しいモデル").click()
             page.get_by_label("モデル名").fill("ブラウザテスト")
@@ -218,14 +232,14 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-instructions")).to_contain_text("セットアップEXE")
             assert (
                 page.locator(
-                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.3-Windows-x64.exe"]'
+                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.4-Windows-x64.exe"]'
                 ).count()
                 == 1
             )
             page.locator('[data-os="linux"]').click()
             expect(page.locator("#download-link")).to_have_attribute(
                 "href",
-                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.3/DeeL-Pyess-v0.1.3.zip",
+                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.4/DeeL-Pyess-v0.1.4.zip",
             )
             page.locator('[data-os="windows"]').click()
             page.locator(".usage-screen img").scroll_into_view_if_needed()

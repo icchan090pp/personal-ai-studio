@@ -28,6 +28,7 @@ from studio.curriculum import MODULES
 from studio.hardware import inspect_system
 from studio.presets import LEVELS
 from studio.public_models import PUBLIC_MODELS, catalog
+from studio.updates import CURRENT_VERSION, check_update
 
 BASE_MODEL = "stable-diffusion-v1-5/stable-diffusion-v1-5"
 VIDEO_MODEL = "THUDM/CogVideoX-5b-I2V"
@@ -340,7 +341,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     @app.get("/api/system")
     def system():
         return {
-            "version": "0.1.3",
+            "version": CURRENT_VERSION,
             "hardware": inspect_system(),
             "desktop_setup": bool(os.environ.get("STUDIO_DESKTOP_COMMAND")),
             "gpu_ready": gpu_available(),
@@ -362,8 +363,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         backend: Literal["auto", "cpu", "cuda", "directml"] = "auto"
         voice: bool = False
 
-    @app.post("/api/system/setup", status_code=202)
-    def setup_runtime(body: SetupInput, request: Request):
+    def desktop_command(payload, request):
         if not request.client or request.client.host not in {"127.0.0.1", "::1"}:
             raise HTTPException(403, "追加機能の導入は、このPCの画面から実行してください")
         command_path = os.environ.get("STUDIO_DESKTOP_COMMAND")
@@ -372,13 +372,35 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 409,
                 "Windows版DeeL Pyessの起動ウィンドウからセットアップしてください。ソース版は python -m studio.setup_runtime を実行できます。",
             )
-        if query("SELECT id FROM jobs WHERE status IN ('queued','running')", one=True):
+        if query("SELECT id FROM jobs WHERE status IN ('queued','running')", one=True) or query(
+            "SELECT id FROM collections WHERE status IN ('queued','running')", one=True
+        ):
             raise HTTPException(409, "実行中の学習・生成が完了してからセットアップしてください")
         try:
             with Path(command_path).open("x", encoding="utf-8") as stream:
-                json.dump(body.model_dump(), stream)
+                json.dump(payload, stream)
         except FileExistsError:
             raise HTTPException(409, "セットアップ要求を処理中です") from None
+
+    @app.get("/api/system/update")
+    def update_info():
+        try:
+            return check_update()
+        except (OSError, ValueError, TypeError, KeyError):
+            raise HTTPException(
+                503, "更新情報を取得できません。ネット接続を確認し、後で再試行してください。"
+            ) from None
+
+    @app.post("/api/system/update", status_code=202)
+    def request_update(request: Request):
+        desktop_command({"action": "update"}, request)
+        return {
+            "message": "起動ウィンドウで更新版を取得します。検証後にインストールの確認を表示します。"
+        }
+
+    @app.post("/api/system/setup", status_code=202)
+    def setup_runtime(body: SetupInput, request: Request):
+        desktop_command(body.model_dump(), request)
         return {
             "status": "accepted",
             "message": "起動ウィンドウで準備を始めます。数GBのダウンロードが必要です。完了後にアプリを再起動します。",

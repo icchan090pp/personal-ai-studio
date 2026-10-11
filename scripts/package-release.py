@@ -7,7 +7,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 destination = root / "artifacts/release"
 destination.mkdir(parents=True, exist_ok=True)
-archive_path = destination / "DeeL-Pyess-v0.1.3.zip"
+archive_path = destination / "DeeL-Pyess-v0.1.4.zip"
 files = [
     root / file
     for file in (
@@ -24,6 +24,7 @@ files = [
         "requirements-app.txt",
         "requirements-gpu.txt",
         "requirements-directml.txt",
+        "requirements-desktop.txt",
         "requirements-audio.txt",
         "requirements-voice.txt",
         "requirements-dev.txt",

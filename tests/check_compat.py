@@ -18,6 +18,9 @@ from studio.setup_runtime import installation_plan
 def check_hardware_and_setup(root, monkeypatch):
     from studio import app as module
     from studio import hardware
+    from tests.check_updates import check_updates
+
+    check_updates(root, monkeypatch)
 
     output = subprocess.run(
         [
@@ -78,6 +81,16 @@ def check_hardware_and_setup(root, monkeypatch):
         assert json.loads(command.read_text()) == {"backend": "cpu", "voice": True}
         assert client.post("/api/system/setup", json={}).status_code == 409
         command.unlink()
+        patch.setattr(
+            module,
+            "check_update",
+            lambda: {"current": "0.1.4", "latest": "0.1.5", "available": True},
+        )
+        assert client.get("/api/system/update").json()["available"]
+        assert client.post("/api/system/update", json={}).status_code == 202
+        assert json.loads(command.read_text()) == {"action": "update"}
+        assert client.post("/api/system/update", json={}).status_code == 409
+        command.unlink()
         pid = client.post("/api/projects", json={"name": "compat", "trigger": "tinytest"}).json()[
             "id"
         ]
@@ -97,9 +110,11 @@ def check_hardware_and_setup(root, monkeypatch):
             and json.loads(response.json()["config"])["public_model"] == "tiny"
         )
         assert client.post("/api/system/setup", json={}).status_code == 409
+        assert client.post("/api/system/update", json={}).status_code == 409
         assert not command.exists()
     with TestClient(application, client=("192.168.1.2", 40000)) as remote:
         assert remote.post("/api/system/setup", json={}).status_code == 403
+        assert remote.post("/api/system/update", json={}).status_code == 403
     hardware.inspect_system.cache_clear()
 
 
