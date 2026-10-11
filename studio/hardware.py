@@ -37,6 +37,16 @@ def selected_backend(root):
         return "auto"
 
 
+def memory_guidance(ram):
+    if ram is None:
+        return "メモリ量を取得できませんでした。軽量画像はRAM 8GB以上が目安です。"
+    if ram < 8:
+        return "RAM 8GB未満です。画像生成はメモリ不足になる可能性があります。画像整理・コースから始め、不要なアプリを終了してください。"
+    if ram < 16:
+        return "RAM 8〜16GBのPCではTiny-SD・ノーマルを推奨します。他のアプリを閉じ、1件ずつ生成してください。"
+    return "軽量画像の目安はRAM 8GB以上です。16GBでも大型モデル・動画には別途十分なGPUメモリが必要です。"
+
+
 def run_json(command, timeout=20):
     result = subprocess.run(
         command,
@@ -190,10 +200,12 @@ def inspect_system():
             dml = run_json([dml_python, "-m", "studio.hardware", "--directml-probe"])
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
             dml["reason"] = str(exc)[:500]
+    ram = memory_gb()
     return {
         **describe(names, libraries, cuda and libraries, cpu and libraries, dml, cuda_build),
         "adapters": names,
-        "ram_gb": memory_gb(),
+        "ram_gb": ram,
+        "memory_guidance": memory_guidance(ram),
         "libraries_ready": libraries,
         "cpu_ready": cpu and libraries,
         "cuda_ready": cuda and libraries,

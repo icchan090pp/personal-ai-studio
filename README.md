@@ -1,6 +1,6 @@
 # DeeL Pyess
 
-独自の画像・動画モデルを育てるローカルWebアプリ。PCと、同じWi-Fiのスマートフォンから操作できます。
+独自の画像・動画モデルを育てるローカルアプリ。Windowsは専用ウィンドウ、Linuxはブラウザで操作できます。スマートフォン接続はソース版で利用します。
 初期検証版です。**100件の製品試験を5回連続で実行**し、全件合格しました。検証スクリプトとJUnit記録を同梱します。
 CUDA実機・実サイズの基盤モデルによる学習／生成品質・個人のWindows実機でのGPU機能は未検証です。Windowsセットアップと基本起動はWindows CIで確認しました。
 
@@ -19,11 +19,17 @@ CUDA実機・実サイズの基盤モデルによる学習／生成品質・個�
 
 ## Windowsへのインストール・更新
 
-[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.3-Windows-x64.exe` を取得して実行してください。
+[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.4-Windows-x64.exe` を取得して実行してください。
 Windows 10/11・64bit用、Python同梱です。既存のDeeL Pyessを終了し、同じ保存先へ上書き更新できます。
 デスクトップの「DeeL Pyess」で起動し、「このPCのAI機能をセットアップ」を実行します。
 投稿データ・完成モデルは `%LOCALAPPDATA%\DeeL Pyess\data`、診断ログは同フォルダのstartup.logです。
 アンインストールでもデータを保持します。EXEは未署名です。
+
+Windows版はWebView2の専用画面で起動します。通常のブラウザタブを開く必要はありません。
+表示エンジンはMicrosoft署名を確認した導入プログラムで準備します。初回はネット接続が必要です。
+アプリ右上の「更新」で最新版を確認・取得できます。公式リリースのSHA256を検証した後、
+インストールの確認画面を表示します。取得・検証が失敗した場合は現在のアプリを変更しません。
+動作中の学習・生成・収集がある間は更新できません。設定画面や更新画面もアプリ内にあります。
 
 ### 一般のノートPC向け（v0.1.3）
 
@@ -31,6 +37,8 @@ NVIDIA CUDA、Windows DirectML（AMD/Intelなど）、CPUを区別して診断�
 AMD/IntelはCUDAを使用できません。DirectMLは独立環境に導入し、CUDA/CPU用のPyTorchを上書きしません。
 「作品をつくる」で「Tiny-SD / 軽量画像」を選ぶと、256pxの画像を生成して指定サイズへ拡大します。
 GPUの演算非対応・メモリ不足時はCPUで再試行し、使用した環境を結果に記録します。
+失敗したGPU処理は記録し、次回からCPUを優先します。「再診断する」でGPUの再試行を許可できます。
+明示的にCPUを選択してセットアップした場合は、軽量画像をCPUで生成する設定を保持します。
 初回セットアップは数GBのダウンロード、Tiny-SDの重みは約1.3GBです。RAM 8GB以上を目安としてください。
 全GPU・全演算の保証はできません。画像LoRA学習、動画、大型モデルは十分なVRAMを持つCUDA GPUが必要です。
 日本語音声と声質特徴抽出はCPUでも利用できます。CPUでは処理に時間がかかります。

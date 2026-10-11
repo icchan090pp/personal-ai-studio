@@ -21,6 +21,10 @@ def check_hardware_and_setup(root, monkeypatch):
     from tests.check_updates import check_updates
 
     check_updates(root, monkeypatch)
+    assert "8GB未満" in hardware.memory_guidance(4)
+    assert "ノーマル" in hardware.memory_guidance(8)
+    assert "GPUメモリ" in hardware.memory_guidance(16)
+    assert "取得できません" in hardware.memory_guidance(None)
 
     output = subprocess.run(
         [
