@@ -38,10 +38,17 @@ jobs:
           $uninstall = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -PassThru -Wait
           if ($uninstall.ExitCode -ne 0 -or (Test-Path "$destination/DeeL Pyess.exe")) { throw 'Uninstall failed' }
           if (-not (Test-Path "$env:LOCALAPPDATA/DeeL Pyess/data")) { throw 'Uninstall deleted user data' }
+      - name: Collect Windows diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/release | Out-Null
+          foreach ($name in @('startup.log', 'windows-desktop.png')) {
+            $source = Join-Path "$env:LOCALAPPDATA/DeeL Pyess" $name
+            if (Test-Path $source) { Copy-Item $source artifacts/release/ }
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-installer
-          path: |
-            artifacts/release/
-            ~/AppData/Local/DeeL Pyess/startup.log
+          path: artifacts/release/

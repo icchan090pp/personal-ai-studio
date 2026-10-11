@@ -207,8 +207,19 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-title")).to_contain_text("Linux")
             expect(page.locator("#os-instructions")).to_contain_text("./install.sh --gpu")
             page.locator('[data-os="windows"]').click()
-            expect(page.locator("#os-instructions")).to_contain_text("Install-Windows.bat")
-            assert page.locator('a[href$="DeeL-Pyess-v0.1.1.zip"]').count() >= 1
+            expect(page.locator("#os-instructions")).to_contain_text("セットアップEXE")
+            assert (
+                page.locator(
+                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe"]'
+                ).count()
+                == 1
+            )
+            page.locator('[data-os="linux"]').click()
+            expect(page.locator("#download-link")).to_have_attribute(
+                "href",
+                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.2/DeeL-Pyess-v0.1.2.zip",
+            )
+            page.locator('[data-os="windows"]').click()
             page.locator(".usage-screen img").scroll_into_view_if_needed()
             expect(page.locator(".usage-screen img")).to_be_visible()
             for screenshot in page.locator("img").all():

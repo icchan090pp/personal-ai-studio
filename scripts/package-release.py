@@ -7,7 +7,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 destination = root / "artifacts/release"
 destination.mkdir(parents=True, exist_ok=True)
-archive_path = destination / "DeeL-Pyess-v0.1.1.zip"
+archive_path = destination / "DeeL-Pyess-v0.1.2.zip"
 files = [
     root / file
     for file in (
@@ -29,7 +29,7 @@ files = [
         "pyproject.toml",
     )
 ]
-for directory in ("studio", "docs", "tests", "scripts", "website"):
+for directory in ("studio", "docs", "tests", "scripts", "website", "windows"):
     files.extend(
         path
         for path in (root / directory).rglob("*")

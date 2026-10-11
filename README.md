@@ -23,7 +23,12 @@ CUDA実機・実サイズの基盤モデルによる学習／生成品質・Wind
 Python 3.12または3.13が必要です。Windowsは `Install-Windows.bat`（GPU版を選択）、`Start-Windows.bat`。
 Linuxは `./install.sh --gpu`、`./start.sh`。通常版なら `./install.sh` でデータ準備・整理・コースを使えます。
 インストーラーは専用 `.venv` に依存ライブラリを導入するPythonスクリプトです。
-Windows署名付きEXE／MSI・Mac用アプリ・APKは提供していません。
+Windows 10 / 11（64bit）は公開リリースの `DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe` を実行してください。
+Python同梱のセットアップです。インストール後はデスクトップまたはスタートメニューの「DeeL Pyess」で起動します。
+上記のBAT手順は開発者向けソースZIPの手順です。一般のWindows利用者にはセットアップEXEを提供します。
+画像・動画／日本語音声・声質の追加機能は、起動ウィンドウのボタンでダウンロードできます。
+このウィンドウを閉じるとサーバーも終了します。データと診断ログは `%LOCALAPPDATA%\DeeL Pyess` に保存し、
+アプリをアンインストールしても学習データを保持します。EXEは未署名です。Mac用アプリ・APKは提供していません。
 
 スマートフォン用はPCで `Start-Phone.bat`／`./start-phone.sh` を実行し、同じ信頼できるWi-Fiで
 表示された接続URLを開きます。計算はPCのCUDA GPUで実行します。接続コードは起動ごとに変わります。
@@ -63,7 +68,7 @@ PNG／4K MP4／AAC音声付加、HTTP API、PC／モバイルの実ブラウザ�
 
 Linuxで実行権限がない場合：`chmod +x install.sh start.sh start-phone.sh` を実行してください。
 
-v0.1.1では、生成専用の公開モデル4種類（SDXL、SSD-1B、PixArt Sigma、LTX-Video）、
+v0.1.2では、生成専用の公開モデル4種類（SDXL、SSD-1B、PixArt Sigma、LTX-Video）、
 ローカルOllama経由のOpenAI gpt-oss-20b/120b学習相談、ウルトラ（画像・動画200ステップ）、
 データを保持する学習停止・リセットを追加しました。追加4モデルのLoRA学習は未対応です。
 公開モデルの実サイズGPU生成・gpt-ossの実推論は本CPU開発環境では未検証です。

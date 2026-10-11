@@ -1,6 +1,7 @@
 """Native desktop launcher; the server and model workers use the bundled Python."""
 
 import argparse
+import io
 import json
 import os
 import queue
@@ -26,6 +27,7 @@ class Application:
         self.log_path = self.data / "startup.log"
         self.log = self.log_path.open("a", encoding="utf-8")
         self.process = None
+        self.ready = False
         self.installer = None
         self.installing = False
         self.smoke = False
@@ -57,7 +59,7 @@ class Application:
         )
         self.buttons = []
         for text, command in (
-            ("アプリを開く", lambda: webbrowser.open(self.url)),
+            ("アプリを開く", self.open_app),
             ("画像・動画の学習機能を追加", lambda: self.install(False)),
             ("画像・動画・日本語音声・声質機能を追加", lambda: self.install(True)),
             ("診断ログを開く", lambda: os.startfile(self.log_path)),
@@ -65,6 +67,8 @@ class Application:
             button = tk.Button(root, text=text, command=command, width=46)
             button.pack(pady=4)
             self.buttons.append(button)
+        for button in self.buttons[:3]:
+            button.configure(state="disabled")
         tk.Label(
             root,
             text="このウィンドウを閉じるとアプリも停止します。\n追加機能・モデルの初回取得にはネット接続と空き容量が必要です。",
@@ -86,6 +90,7 @@ class Application:
         )
 
     def start(self, browser=True):
+        self.ready = False
         if not self.python.is_file():
             raise RuntimeError(
                 "同梱Pythonが見つかりません。Windowsセットアップを再インストールしてください。"
@@ -109,6 +114,7 @@ class Application:
         threading.Thread(target=wait, daemon=True).start()
 
     def stop(self):
+        self.ready = False
         if self.process and self.process.poll() is None:
             subprocess.run(
                 ["taskkill", "/PID", str(self.process.pid), "/T", "/F"],
@@ -116,6 +122,13 @@ class Application:
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
             self.process.wait(timeout=15)
+
+    def open_app(self):
+        if self.ready:
+            webbrowser.open(self.url)
+        elif not self.installing and (not self.process or self.process.poll() is not None):
+            self.status.set("アプリを再起動しています…")
+            self.start()
 
     def install(self, voice):
         if self.installing:
@@ -153,6 +166,9 @@ class Application:
         while not self.events.empty():
             event, value = self.events.get()
             if event == "ready":
+                self.ready = True
+                for button in self.buttons:
+                    button.configure(state="normal")
                 self.status.set("起動しました。ブラウザで画像の投稿・学習コースを使えます。")
                 if value:
                     webbrowser.open(self.url)
@@ -167,6 +183,9 @@ class Application:
                 self.status.set(value)
                 if not self.smoke:
                     messagebox.showerror("DeeL Pyess", value + "\n" + str(self.log_path))
+        if self.ready and self.process.poll() is not None:
+            self.ready = False
+            self.events.put(("error", "アプリが停止しました。診断ログをご確認ください。"))
         self.root.after(200, self.poll)
 
     def close(self):
@@ -194,25 +213,41 @@ def main():
     app.start(browser=not args.smoke_test)
     if args.smoke_test:
         # Exercise the same GUI and server launch path as a real double-click.
-        root.withdraw()
         deadline = time.monotonic() + 75
 
         outcome = {"passed": False}
 
         def check():
             if app.status.get().startswith("起動しました"):
-                with urllib.request.urlopen(app.url + "/", timeout=5) as response:
-                    assert b"DeeL" in response.read()
-                with urllib.request.urlopen(app.url + "/api/models", timeout=5) as response:
-                    assert {model["kind"] for model in json.load(response)} == {"image", "video"}
-                outcome["passed"] = True
-                (app.data / "windows-smoke.json").write_text(
-                    json.dumps(
-                        {"passed": True, "python": str(app.python), "data": str(app.data / "data")}
-                    ),
-                    encoding="utf-8",
-                )
-                app.close()
+                try:
+                    validate_installed_app(app)
+                    root.update_idletasks()
+                    from PIL import ImageGrab
+
+                    ImageGrab.grab(
+                        bbox=(
+                            root.winfo_rootx(),
+                            root.winfo_rooty(),
+                            root.winfo_rootx() + root.winfo_width(),
+                            root.winfo_rooty() + root.winfo_height(),
+                        )
+                    ).save(app.data / "windows-desktop.png")
+                    outcome["passed"] = True
+                    (app.data / "windows-smoke.json").write_text(
+                        json.dumps(
+                            {
+                                "passed": True,
+                                "python": str(app.python),
+                                "data": str(app.data / "data"),
+                                "checks": ["gui", "server", "models", "upload", "persistence"],
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                except Exception as exc:
+                    app.log.write(str(exc) + "\n")
+                finally:
+                    app.close()
             elif time.monotonic() > deadline or app.status.get().startswith("起動できません"):
                 app.close()
             else:
@@ -222,6 +257,44 @@ def main():
     root.mainloop()
     if args.smoke_test and not outcome["passed"]:
         raise SystemExit(1)
+
+
+def validate_installed_app(app):
+    from PIL import Image
+
+    with urllib.request.urlopen(app.url + "/", timeout=5) as response:
+        assert b"DeeL" in response.read()
+    with urllib.request.urlopen(app.url + "/api/models", timeout=5) as response:
+        assert {model["kind"] for model in json.load(response)} == {"image", "video"}
+    request = urllib.request.Request(
+        app.url + "/api/projects",
+        data=json.dumps({"name": "Windows 起動試験", "trigger": "windowscheck"}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        assert response.status == 201
+        project = json.load(response)["id"]
+    image = io.BytesIO()
+    Image.new("RGB", (128, 128), "blue").save(image, format="PNG")
+    boundary = "DeeLPyessSmokeBoundary"
+    body = (
+        (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="files"; filename="image.png"\r\nContent-Type: image/png\r\n\r\n'
+        ).encode()
+        + image.getvalue()
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+    request = urllib.request.Request(
+        app.url + f"/api/projects/{project}/images",
+        data=body,
+        headers={"Content-Type": "multipart/form-data; boundary=" + boundary},
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        assert response.status == 201
+        assert len(json.load(response)) == 1
+    with urllib.request.urlopen(app.url + f"/api/projects/{project}/images", timeout=5) as response:
+        assert len(json.load(response)) == 1
+    assert (app.data / "data").is_dir()
 
 
 if __name__ == "__main__":
