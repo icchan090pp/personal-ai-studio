@@ -79,6 +79,9 @@ jobs:
             $source = Join-Path "$env:LOCALAPPDATA/DeeL Pyess" $name
             if (Test-Path $source) { Copy-Item $source artifacts/release/ }
           }
+          if (Test-Path "$env:LOCALAPPDATA/DeeL Pyess/startup.log") {
+            Get-Content "$env:LOCALAPPDATA/DeeL Pyess/startup.log" -Tail 100
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
