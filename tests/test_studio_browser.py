@@ -63,24 +63,36 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.locator("#close-hardware").click()
             page.locator("#update-button").click()
             expect(page.locator("#update-dialog")).to_be_visible()
-            expect(page.locator("#update-version")).to_contain_text("0.1.4")
+            expect(page.locator("#update-version")).to_contain_text("0.1.5")
             page.route(
                 "**/api/system/update",
                 lambda route: route.fulfill(
-                    json={"current": "0.1.4", "latest": "0.1.5", "available": True}
+                    json={"current": "0.1.5", "latest": "0.1.6", "available": True}
                 ),
             )
             page.locator("#check-update").click()
-            expect(page.locator("#update-status")).to_contain_text("0.1.5")
+            expect(page.locator("#update-status")).to_contain_text("0.1.6")
             expect(page.locator("#install-update")).to_be_disabled()
             page.screenshot(path=str(screenshots / f"update-{viewport['width']}.png"))
             page.locator("#close-update").click()
             expect(page.locator("#public-model")).to_have_value("tiny")
-            page.get_by_role("button", name="＋ 新しいモデル").click()
-            page.get_by_label("モデル名").fill("ブラウザテスト")
+            expect(page.get_by_label("作業プロジェクトを選択")).to_be_visible()
+            page.get_by_role("button", name="Tiny-SDで画像をつくる").click()
+            expect(page.locator("#public-model")).to_be_visible()
+            expect(page.locator("#public-model")).to_have_value("tiny")
+            expect(page.locator("#projects option")).to_have_count(1)
+            first_project = page.locator("#projects").input_value()
+            expect(page.locator("#prompt-help")).to_contain_text("追加学習不要")
+            page.reload()
+            page.get_by_role("button", name="Tiny-SDで画像をつくる").click()
+            expect(page.locator("#projects")).to_have_value(first_project)
+            expect(page.locator("#projects option")).to_have_count(1)
+            page.get_by_role("button", name="＋ 新しいプロジェクト").click()
+            page.get_by_label("プロジェクト名").fill("ブラウザテスト")
             page.get_by_label("トリガーワード", exact=True).fill("browserstyle")
-            page.get_by_role("button", name="モデルを作成する ↗").click()
+            page.get_by_role("button", name="プロジェクトを作成する ↗").click()
             expect(page.locator("#projects")).to_contain_text("ブラウザテスト")
+            page.get_by_role("button", name="モデルを育てる").click()
             page.locator("#upload").set_input_files(str(image))
             expect(page.locator("#image-count")).to_have_text("1 / 100枚")
             expect(page.locator("#images img")).to_be_visible()
@@ -195,6 +207,11 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.locator("#audio-model").select_option("kokoro")
             expect(page.get_by_label("音声", exact=True)).to_be_checked()
             expect(page.locator("#use-voice")).to_be_visible()
+            page.get_by_role("button", name="Tiny-SDで画像をつくる").click()
+            expect(page.locator("#public-model")).to_be_visible()
+            expect(page.locator("#public-model")).to_have_value("tiny")
+            expect(page.locator("#projects")).to_have_value(pid)
+            expect(page.locator("#projects option")).to_have_count(2)
             page.get_by_label("画像", exact=True).check()
             expect(page.locator("#audio-model")).to_have_value("")
             page.locator("#output-resolution").select_option("custom")
@@ -221,6 +238,18 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.screenshot(
                 path=str(screenshots / f"studio-{viewport['width']}.png"), full_page=True
             )
+            page.get_by_role("button", name="Tiny-SDで画像をつくる").click()
+            page.locator("#prompt").fill("a blue watercolor bird")
+            with page.expect_response(f"**/api/projects/{pid}/generate") as generated:
+                page.locator("#generate-button").click()
+            assert generated.value.status == 202
+            with sqlite3.connect(tmp_path / "data/studio.sqlite3") as db:
+                row = db.execute(
+                    "SELECT config FROM jobs WHERE project_id=? AND kind='image' ORDER BY rowid DESC LIMIT 1",
+                    (pid,),
+                ).fetchone()
+                assert json.loads(row[0])["public_model"] == "tiny"
+            page.screenshot(path=str(screenshots / f"tiny-{viewport['width']}.png"))
             page.goto(f"http://127.0.0.1:{port}/website/")
             expect(
                 page.get_by_role("heading", name="自分のAIを、 つくるところから。")
@@ -232,14 +261,14 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-instructions")).to_contain_text("セットアップEXE")
             assert (
                 page.locator(
-                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.4-Windows-x64.exe"]'
+                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe"]'
                 ).count()
                 == 1
             )
             page.locator('[data-os="linux"]').click()
             expect(page.locator("#download-link")).to_have_attribute(
                 "href",
-                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.4/DeeL-Pyess-v0.1.4.zip",
+                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.5/DeeL-Pyess-v0.1.5.zip",
             )
             page.locator('[data-os="windows"]').click()
             page.locator(".usage-screen img").scroll_into_view_if_needed()

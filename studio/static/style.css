@@ -28,3 +28,7 @@
 .job-row,.gallery-grid .panel{overflow-wrap:anywhere}.preview audio,.gallery-grid audio{width:100%;max-width:100%}.chat-history{white-space:pre-wrap;overflow-wrap:anywhere}
 
 input[type=checkbox],.collection-panel input[type=checkbox]{display:inline-block;width:auto;margin:0 7px 0 0;padding:0;accent-color:#438dff;vertical-align:middle}
+
+.quick-generate{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px;margin:0 0 20px;border:1px solid #315a87;border-radius:12px;background:#0b1b30}.quick-generate h2{margin:6px 0}.quick-generate p{font-size:11px;color:#a8bdd9;margin:0}.quick-generate button{flex-shrink:0}@media(max-width:700px){.quick-generate{align-items:stretch;flex-direction:column;gap:14px}.quick-generate button{justify-content:center}}
+
+.project-bar .side-label{white-space:nowrap;letter-spacing:.04em;flex-shrink:0}

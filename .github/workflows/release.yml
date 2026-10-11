@@ -39,8 +39,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v0.1.4 >/dev/null 2>&1; then
-            echo 'v0.1.4 already exists; published installers must not be overwritten.'
+          if gh release view v0.1.5 >/dev/null 2>&1; then
+            echo 'v0.1.5 already exists; published installers must not be overwritten.'
             exit 1
           fi
-          gh release create v0.1.4 artifacts/release/DeeL-Pyess-v0.1.4.zip artifacts/release/DeeL-Pyess-Setup-v0.1.4-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.4 — Native app, in-app updates and laptop compatibility' --prerelease --notes-file docs/release-notes.md
+          gh release create v0.1.5 artifacts/release/DeeL-Pyess-v0.1.5.zip artifacts/release/DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.5 — Clear Tiny-SD selection and quick image creation' --prerelease --notes-file docs/release-notes.md

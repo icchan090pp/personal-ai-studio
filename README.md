@@ -19,7 +19,7 @@ CUDA実機・実サイズの基盤モデルによる学習／生成品質・個�
 
 ## Windowsへのインストール・更新
 
-[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.4-Windows-x64.exe` を取得して実行してください。
+[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe` を取得して実行してください。
 Windows 10/11・64bit用、Python同梱です。既存のDeeL Pyessを終了し、同じ保存先へ上書き更新できます。
 デスクトップの「DeeL Pyess」で起動し、「このPCのAI機能をセットアップ」を実行します。
 投稿データ・完成モデルは `%LOCALAPPDATA%\DeeL Pyess\data`、診断ログは同フォルダのstartup.logです。

@@ -6,7 +6,7 @@ import re
 import urllib.request
 from pathlib import Path
 
-CURRENT_VERSION = "0.1.4"
+CURRENT_VERSION = "0.1.5"
 REPOSITORY = "icchan090pp/personal-ai-studio"
 RELEASES = f"https://api.github.com/repos/{REPOSITORY}/releases?per_page=30"
 DOWNLOADS = f"https://github.com/{REPOSITORY}/releases/download/"

@@ -7,7 +7,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 destination = root / "artifacts/release"
 destination.mkdir(parents=True, exist_ok=True)
-archive_path = destination / "DeeL-Pyess-v0.1.4.zip"
+archive_path = destination / "DeeL-Pyess-v0.1.5.zip"
 files = [
     root / file
     for file in (

@@ -33,14 +33,22 @@ def main():
     def verify():
         try:
             for _ in range(100):
-                if window.evaluate_js("document.querySelector('#app-version')?.textContent || ''"):
+                if window.evaluate_js(
+                    "document.querySelector('#app-version')?.textContent && !document.querySelector('#quick-tiny')?.disabled"
+                ):
                     break
                 time.sleep(0.2)
             assert window.evaluate_js(
                 "document.querySelector('h1').textContent.includes('モデルに')"
             )
-            window.evaluate_js("document.querySelector('[data-tab=generate]').click()")
+            assert window.evaluate_js(
+                "document.querySelector('#projects').getAttribute('aria-label') === '作業プロジェクトを選択'"
+            )
+            window.evaluate_js("document.querySelector('#quick-tiny').click()")
             assert window.evaluate_js("!document.querySelector('#generate').hidden")
+            assert window.evaluate_js(
+                "document.querySelector('#public-model').value === 'tiny' && !document.querySelector('#public-model-label').hidden"
+            )
             window.evaluate_js("document.querySelector('#update-button').click()")
             assert window.evaluate_js("document.querySelector('#update-dialog').open")
             window.evaluate_js(
@@ -59,6 +67,7 @@ def main():
                             "webview2",
                             "real_app_dom",
                             "generation_navigation",
+                            "tiny_sd_quick_selection",
                             "update_dialog",
                             "hardware_dialog",
                         ],
