@@ -31,4 +31,14 @@ LEVELS = {
         "rank": 32,
         "learning_rate": 0.00005,
     },
+    "ultra": {
+        "name": "ウルトラ（レベル200）",
+        "image_steps": 200,
+        "video_steps": 200,
+        "image_guidance": 8.5,
+        "video_guidance": 7.0,
+        "training_steps": 5000,
+        "rank": 32,
+        "learning_rate": 0.00005,
+    },
 }

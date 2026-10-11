@@ -7,7 +7,10 @@ on:
 permissions:
   contents: write
 jobs:
+  verify_release:
+    uses: ./.github/workflows/verify.yml
   release:
+    needs: verify_release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +28,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v0.1.0 >/dev/null 2>&1; then
-            gh release upload v0.1.0 artifacts/release/DeeL-Pyess-v0.1.0.zip artifacts/release/SHA256SUMS.txt --clobber
+          if gh release view v0.1.1 >/dev/null 2>&1; then
+            gh release upload v0.1.1 artifacts/release/DeeL-Pyess-v0.1.1.zip artifacts/release/SHA256SUMS.txt --clobber
           else
-            gh release create v0.1.0 artifacts/release/DeeL-Pyess-v0.1.0.zip artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.0 — Preview' --prerelease --notes-file docs/release-notes.md
+            gh release create v0.1.1 artifacts/release/DeeL-Pyess-v0.1.1.zip artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.1 — Preview' --prerelease --notes-file docs/release-notes.md
           fi

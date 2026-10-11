@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -21,9 +22,11 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field, field_validator
 
+from studio.audio_models import AUDIO_MODELS
 from studio.collection import collect, public_address
 from studio.curriculum import MODULES
 from studio.presets import LEVELS
+from studio.public_models import PUBLIC_MODELS, catalog
 
 BASE_MODEL = "stable-diffusion-v1-5/stable-diffusion-v1-5"
 VIDEO_MODEL = "THUDM/CogVideoX-5b-I2V"
@@ -37,9 +40,9 @@ class ProjectInput(BaseModel):
 
 
 class TrainingInput(BaseModel):
-    target: Literal["image", "video", "audio"] = "image"
+    target: Literal["image", "video", "audio", "voice"] = "image"
     instruction: str = Field(default="", max_length=2000)
-    level: Literal["normal", "power", "excellent"] | None = None
+    level: Literal["normal", "power", "excellent", "ultra"] | None = None
     mode: str = Field(
         default="supervised",
         pattern=r"^(supervised|semi_supervised|style|reinforcement|generation_test|imitation)$",
@@ -52,9 +55,12 @@ class TrainingInput(BaseModel):
 
 
 class GenerationInput(BaseModel):
+    public_model: Literal["sdxl", "ssd", "pixart", "ltx"] | None = None
+    audio_model: Literal["audioldm2", "kokoro"] | None = None
+    use_voice: bool = False
     resolution: Literal["native", "720p", "1080p", "1440p", "4k", "custom"] = "720p"
-    level: Literal["normal", "power", "excellent"] | None = None
-    kind: str = Field(default="image", pattern=r"^(image|video)$")
+    level: Literal["normal", "power", "excellent", "ultra"] | None = None
+    kind: str = Field(default="image", pattern=r"^(image|video|audio)$")
     prompt: str = Field(min_length=1, max_length=2000)
     negative_prompt: str = Field(default="", max_length=2000)
     seed: int = Field(default=42, ge=0, le=2**32 - 1)
@@ -101,6 +107,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 id TEXT PRIMARY KEY, project_id TEXT, channel TEXT, role TEXT, content TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
             CREATE TABLE IF NOT EXISTS media (
                 id TEXT PRIMARY KEY, project_id TEXT, kind TEXT, caption TEXT, group_name TEXT DEFAULT 'default', created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS media_sources (media_id TEXT PRIMARY KEY, url TEXT, page TEXT, license TEXT);
             CREATE TABLE IF NOT EXISTS collections (
                 id TEXT PRIMARY KEY, project_id TEXT, status TEXT, imported INTEGER DEFAULT 0, error TEXT, config TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
             CREATE TABLE IF NOT EXISTS image_sources (
@@ -146,18 +153,49 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
 
         return torch.cuda.is_available()
 
+    process_guard = threading.RLock()
+    active_processes = {}
+
+    def stop_process(process):
+        if process.poll() is None:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    check=False,
+                    capture_output=True,
+                )
+            else:
+                os.killpg(process.pid, signal.SIGTERM)
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                if os.name != "nt":
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()
+                process.wait()
+
     def worker():
         # One process owns the GPU; multiple Uvicorn workers are unsupported.
         with lock:
             while job := query(
                 "SELECT * FROM jobs WHERE status='queued' ORDER BY rowid LIMIT 1", one=True
             ):
-                query("UPDATE jobs SET status='running' WHERE id=?", (job["id"],))
+                query(
+                    "UPDATE jobs SET status='running' WHERE id=? AND status='queued'", (job["id"],)
+                )
                 folder = root / "jobs" / job["id"]
                 folder.mkdir(parents=True, exist_ok=True)
                 try:
-                    with (folder / "worker.log").open("w") as log:
-                        result = subprocess.run(
+                    with (folder / "worker.log").open("w") as log, process_guard:
+                        if (
+                            query("SELECT status FROM jobs WHERE id=?", (job["id"],), True)[
+                                "status"
+                            ]
+                            != "running"
+                        ):
+                            continue
+                        result = subprocess.Popen(
                             [
                                 sys.executable,
                                 "-m",
@@ -169,8 +207,17 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                             ],
                             stdout=log,
                             stderr=log,
-                            check=False,
+                            start_new_session=os.name != "nt",
                         )
+                        active_processes[job["id"]] = result
+                    result.wait()
+                    with process_guard:
+                        active_processes.pop(job["id"], None)
+                    if (
+                        query("SELECT status FROM jobs WHERE id=?", (job["id"],), True)["status"]
+                        != "running"
+                    ):
+                        continue
                     if result.returncode:
                         # Keep full diagnostics local rather than exposing paths or tokens in API.
                         raise RuntimeError(
@@ -180,17 +227,21 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                         "train": "adapter.zip",
                         "video_train": "adapter.zip",
                         "audio_train": "adapter.zip",
+                        "voice_train": "adapter.zip",
                         "image": "output.png",
                         "video": "output.mp4",
+                        "audio": "output.wav",
                     }
                     if not (folder / expected[job["kind"]]).is_file():
                         raise RuntimeError("出力ファイルを確認できません。再実行してください。")
                     query(
-                        "UPDATE jobs SET status='completed', progress=100 WHERE id=?", (job["id"],)
+                        "UPDATE jobs SET status='completed', progress=100 WHERE id=? AND status='running'",
+                        (job["id"],),
                     )
                 except Exception as exc:
                     query(
-                        "UPDATE jobs SET status='failed', error=? WHERE id=?", (str(exc), job["id"])
+                        "UPDATE jobs SET status='failed', error=? WHERE id=? AND status='running'",
+                        (str(exc), job["id"]),
                     )
 
     @asynccontextmanager
@@ -204,7 +255,12 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         query(
             "UPDATE collections SET status='failed', error='再起動されました。再収集してください' WHERE status='running'"
         )
-        yield
+        try:
+            yield
+        finally:
+            with process_guard:
+                for process in list(active_processes.values()):
+                    stop_process(process)
 
     app = FastAPI(title="DeeL Pyess", lifespan=lifespan)
 
@@ -278,6 +334,8 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     def system():
         return {
             "gpu_ready": gpu_available(),
+            "speech_ready": bool(importlib.util.find_spec("kokoro")),
+            "voice_ready": bool(importlib.util.find_spec("openvoice")),
             "base_model": BASE_MODEL,
             "video_model": VIDEO_MODEL,
             "checkpoint": os.getenv("STUDIO_CHECKPOINT", BASE_MODEL),
@@ -330,6 +388,35 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             },
         ]
 
+    @app.get("/api/public-models")
+    def public_model_catalog():
+        return catalog()
+
+    @app.get("/api/audio-models")
+    def audio_catalog():
+        return [
+            {**v, "key": k, "trainable": False, "weights_url": "https://huggingface.co/" + v["id"]}
+            for k, v in AUDIO_MODELS.items()
+        ]
+
+    class AssistantInput(BaseModel):
+        prompt: str = Field(min_length=1, max_length=4000)
+        model: Literal["gpt-oss:20b", "gpt-oss:120b"] = "gpt-oss:20b"
+        level: Literal["normal", "power", "excellent", "ultra"] = "normal"
+
+    @app.post("/api/projects/{project_id}/assistant")
+    def assistant(project_id: str, body: AssistantInput):
+        project_or_404(project_id)
+        from studio.assistant import ask
+
+        try:
+            answer = ask(body.model, body.prompt, body.level)
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise HTTPException(
+                503, "ローカルOllamaを起動し、モデルを取得してください。" + str(exc)
+            ) from exc
+        return {"answer": answer, "model": body.model}
+
     @app.get("/api/projects")
     def projects():
         return query(
@@ -350,7 +437,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         return project_or_404(project_id)
 
     class LevelInput(BaseModel):
-        level: Literal["normal", "power", "excellent"]
+        level: Literal["normal", "power", "excellent", "ultra"]
 
     @app.patch("/api/projects/{project_id}/level")
     def set_level(project_id: str, body: LevelInput):
@@ -451,6 +538,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         files: list[UploadFile] = File(...),
         kind: Literal["video", "audio"] = Form(...),
         group_name: str = Form("default", max_length=40),
+        extract_audio: bool = Form(False),
     ):
         project = project_or_404(project_id)
         if not 1 <= len(files) <= 10:
@@ -463,6 +551,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         from studio.video_learning import normalise_video
 
         validated = []
+        extracted = []
         for file in files:
             data = await file.read(50 * 1024 * 1024 + 1)
             if len(data) > 50 * 1024 * 1024:
@@ -475,6 +564,11 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                         output = Path(tmp) / "normalised.mp4"
                         normalise_video(data, output)
                         validated.append(output.read_bytes())
+                        if extract_audio:
+                            try:
+                                extracted.append(read_audio(path))
+                            except Exception as exc:
+                                raise ValueError("動画に1秒以上の音声トラックが必要です") from exc
                     else:
                         validated.append(read_audio(path))
             except Exception as exc:
@@ -488,7 +582,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             count = db.execute(
                 "SELECT COUNT(*) FROM media WHERE project_id=?", (project_id,)
             ).fetchone()[0]
-            if count + len(validated) > 30:
+            if count + len(validated) + len(extracted) > 30:
                 raise HTTPException(422, "音声・動画は合計30ファイルまでです")
             for data in validated:
                 iid = uuid.uuid4().hex
@@ -505,12 +599,30 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                     "INSERT INTO media(id,project_id,kind,caption,group_name) VALUES(?,?,?,?,?)",
                     (iid, project_id, kind, caption, group_name.strip() or "default"),
                 )
-        return query("SELECT * FROM media WHERE project_id=? ORDER BY rowid", (project_id,))
+            for waveform in extracted:
+                iid = uuid.uuid4().hex
+                write_audio(folder / f"{iid}.wav", waveform)
+                db.execute(
+                    "INSERT INTO media(id,project_id,kind,caption,group_name) VALUES(?,?,'audio',?,?)",
+                    (
+                        iid,
+                        project_id,
+                        f"sound of {project['trigger']}",
+                        group_name.strip() or "default",
+                    ),
+                )
+        return query(
+            "SELECT media.*,media_sources.page AS source_page FROM media LEFT JOIN media_sources ON media.id=media_sources.media_id WHERE project_id=? ORDER BY media.rowid",
+            (project_id,),
+        )
 
     @app.get("/api/projects/{project_id}/media")
     def media_list(project_id: str):
         project_or_404(project_id)
-        return query("SELECT * FROM media WHERE project_id=? ORDER BY rowid", (project_id,))
+        return query(
+            "SELECT media.*,media_sources.page AS source_page FROM media LEFT JOIN media_sources ON media.id=media_sources.media_id WHERE project_id=? ORDER BY media.rowid",
+            (project_id,),
+        )
 
     class MediaCaption(BaseModel):
         caption: str = Field(min_length=1, max_length=1000)
@@ -543,7 +655,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         provider: Literal["site", "commons"] = "site"
         url: str = Field(default="", max_length=2000)
         query: str = Field(default="", max_length=200)
-        media: Literal["image", "video", "both"] = "both"
+        media: Literal["image", "video", "both", "audio", "all"] = "both"
         group: str = Field(default="web", min_length=1, max_length=40)
         max_files: int = Field(default=10, ge=1, le=10)
 
@@ -582,7 +694,32 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                             "SELECT COUNT(*) FROM images WHERE project_id=?", (project_id,)
                         ).fetchone()[0]
                     )
-                    for item in gathered[: max(0, available)]:
+                    for item in gathered:
+                        if item.get("audio_data") is not None:
+                            from studio.sound import write_audio
+
+                            if (
+                                db.execute(
+                                    "SELECT COUNT(*) FROM media WHERE project_id=?", (project_id,)
+                                ).fetchone()[0]
+                                < 30
+                            ):
+                                mid = uuid.uuid4().hex
+                                media_folder = root / "projects" / project_id / "media"
+                                media_folder.mkdir(parents=True, exist_ok=True)
+                                write_audio(media_folder / f"{mid}.wav", item["audio_data"])
+                                db.execute(
+                                    "INSERT INTO media(id,project_id,kind,caption,group_name) VALUES(?, ?, 'audio', ?, ?)",
+                                    (mid, project_id, f"sound of {project['trigger']}", body.group),
+                                )
+                                db.execute(
+                                    "INSERT INTO media_sources VALUES(?,?,?,?)",
+                                    (mid, item["url"], item["page"], item["license"]),
+                                )
+                                count += 1
+                        if item.get("image") is None or available <= 0:
+                            continue
+                        available -= 1
                         if item.get("video_data"):
                             try:
                                 from studio.video_learning import normalise_video
@@ -634,7 +771,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                         else ""
                     ) + " / ".join(errors[:3])
                     if not count:
-                        message = "対応する画像・動画が見つかりませんでした。URL・キーワードを変更してください。"
+                        message = "対応する画像・動画・音声が見つかりませんでした。URL・キーワードを変更してください。"
                     db.execute(
                         "UPDATE collections SET status=?, imported=?,error=? WHERE id=?",
                         ("completed" if count else "failed", count, message, cid),
@@ -690,7 +827,21 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         return FileResponse(root / "projects" / row["project_id"] / "images" / f"{image_id}.png")
 
     def enqueue(project_id, kind, config):
-        if not gpu_available():
+        cpu_voice = kind == "voice_train" or (
+            kind == "audio" and config.get("audio_model") == "kokoro"
+        )
+        optional = (
+            "openvoice"
+            if kind == "voice_train" or config.get("use_voice")
+            else "kokoro"
+            if config.get("audio_model") == "kokoro"
+            else None
+        )
+        if optional and not importlib.util.find_spec(optional):
+            raise HTTPException(
+                503, "音声機能をインストールしてください：python install.py --gpu --voice"
+            )
+        if not cpu_voice and not gpu_available():
             raise HTTPException(503, "GPU未接続です。CUDA GPUとrequirements-gpu.txtが必要です。")
         job_id = uuid.uuid4().hex
         with sqlite3.connect(db_path) as db:
@@ -705,6 +856,29 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             threading.Thread(target=worker, daemon=True).start()
         return query("SELECT * FROM jobs WHERE id=?", (job_id,), True)
 
+    @app.post("/api/projects/{project_id}/training/reset")
+    def reset_training(project_id: str):
+        project_or_404(project_id)
+        with process_guard:
+            rows = query(
+                "SELECT id FROM jobs WHERE project_id=? AND kind IN ('train','video_train','audio_train','voice_train') AND status IN ('queued','running','failed')",
+                (project_id,),
+            )
+            for row in rows:
+                query(
+                    "UPDATE jobs SET status='cancelled', progress=0, error=NULL WHERE id=?",
+                    (row["id"],),
+                )
+                process = active_processes.get(row["id"])
+                if process:
+                    stop_process(process)
+                query("UPDATE jobs SET progress=0 WHERE id=?", (row["id"],))
+            return {
+                "reset_count": len(rows),
+                "data_preserved": True,
+                "completed_models_preserved": True,
+            }
+
     @app.post("/api/projects/{project_id}/train", status_code=202)
     def train(project_id: str, body: TrainingInput):
         project_or_404(project_id)
@@ -714,7 +888,8 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                     422, "音声・動画学習は、かんたん・写し・スタイル学習を選択してください"
                 )
             rows = query(
-                "SELECT * FROM media WHERE project_id=? AND kind=?", (project_id, body.target)
+                "SELECT * FROM media WHERE project_id=? AND kind=?",
+                (project_id, "audio" if body.target == "voice" else body.target),
             )
             if body.group:
                 rows = [row for row in rows if row["group_name"] == body.group]
@@ -769,21 +944,57 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     @app.post("/api/projects/{project_id}/generate", status_code=202)
     def generate(project_id: str, body: GenerationInput):
         project_or_404(project_id)
+        if body.use_voice and body.audio_model != "kokoro":
+            raise HTTPException(422, "声質の反映にはKokoro読み上げモデルを選択してください")
+        voice = (
+            query(
+                "SELECT id FROM jobs WHERE project_id=? AND kind='voice_train' AND status='completed' ORDER BY rowid DESC LIMIT 1",
+                (project_id,),
+                True,
+            )
+            if body.use_voice
+            else None
+        )
+        if body.use_voice and not voice:
+            raise HTTPException(422, "先に声質の特徴を取り込んでください")
+        if (
+            body.kind == "video"
+            and body.with_audio
+            and body.audio_model == "kokoro"
+            and not body.audio_prompt.strip()
+        ):
+            raise HTTPException(422, "動画の読み上げ文章を音声プロンプトに入力してください")
+        if body.kind == "audio" and not body.audio_model:
+            raise HTTPException(422, "音声用の公開モデルを選択してください")
+        if body.audio_model and body.kind == "image":
+            raise HTTPException(422, "音声モデルは音声・動画で使用します")
+        if body.public_model and PUBLIC_MODELS[body.public_model]["kind"] != body.kind:
+            raise HTTPException(422, "生成対象と公開モデルが一致しません")
+        if body.public_model and body.with_audio and not body.audio_model:
+            raise HTTPException(422, "追加動画モデルの音声は公開音声モデルを選択してください")
         if body.with_audio and body.kind != "video":
             raise HTTPException(422, "音声は動画出力で利用できます")
-        if body.with_audio and not query(
-            "SELECT id FROM jobs WHERE project_id=? AND kind='audio_train' AND status='completed'",
-            (project_id,),
-            True,
+        if (
+            body.with_audio
+            and not body.audio_model
+            and not query(
+                "SELECT id FROM jobs WHERE project_id=? AND kind='audio_train' AND status='completed'",
+                (project_id,),
+                True,
+            )
         ):
             raise HTTPException(422, "先に音声モデルを学習してください")
-        if not query(
-            "SELECT id FROM jobs WHERE project_id=? AND kind='train' AND status='completed'",
-            (project_id,),
-            True,
+        if (
+            not body.public_model
+            and body.kind != "audio"
+            and not query(
+                "SELECT id FROM jobs WHERE project_id=? AND kind='train' AND status='completed'",
+                (project_id,),
+                True,
+            )
         ):
             raise HTTPException(422, "先にモデルを学習してください")
-        if body.kind == "video":
+        if body.kind == "video" and not body.public_model:
             source = query(
                 "SELECT * FROM jobs WHERE id=? AND project_id=? AND kind='image' "
                 "AND status='completed'",
@@ -794,13 +1005,18 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 raise HTTPException(422, "動画の元になる生成済み画像を選んでください")
         project = project_or_404(project_id)
         config = body.model_dump()
+        config["voice_job_id"] = voice["id"] if voice else None
         config["level"] = body.level or project["level"]
         preset = LEVELS[config["level"]]
-        config["inference_steps"] = preset[f"{body.kind}_steps"]
-        config["guidance_scale"] = preset[f"{body.kind}_guidance"]
+        config["inference_steps"] = preset["video_steps" if body.kind == "video" else "image_steps"]
+        config["guidance_scale"] = preset[
+            "video_guidance" if body.kind == "video" else "image_guidance"
+        ]
         config["prompt"] = ", ".join(
             value for value in (body.prompt.strip(), project["rules_prompt"]) if value
         )
+        if body.kind == "audio" and body.audio_model == "kokoro":
+            config["prompt"] = body.prompt.strip()
         config["negative_prompt"] = ", ".join(
             value for value in (body.negative_prompt.strip(), project["negative_rules"]) if value
         )
@@ -886,11 +1102,17 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     def jobs(project_id: str):
         project_or_404(project_id)
         rows = query(
-            "SELECT id,project_id,kind,status,progress,error,created_at FROM jobs "
+            "SELECT id,project_id,kind,status,progress,error,created_at,config FROM jobs "
             "WHERE project_id=? ORDER BY rowid DESC",
             (project_id,),
         )
         for row in rows:
+            config = json.loads(row.pop("config"))
+            selected = config.get("audio_model") or config.get("public_model")
+            row["model_name"] = AUDIO_MODELS.get(selected, PUBLIC_MODELS.get(selected, {})).get(
+                "name", ""
+            )
+            row["voice_applied"] = bool(config.get("voice_job_id"))
             feedback_row = query(
                 "SELECT rating FROM images WHERE origin_job_id=?", (row["id"],), True
             )
@@ -911,8 +1133,10 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             "train": "adapter.zip",
             "video_train": "adapter.zip",
             "audio_train": "adapter.zip",
+            "voice_train": "adapter.zip",
             "image": "output.png",
             "video": "output.mp4",
+            "audio": "output.wav",
         }
         name = names[job["kind"]]
         return FileResponse(root / "jobs" / job_id / name, filename=name if download else None)

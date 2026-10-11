@@ -13,6 +13,11 @@ def main():
     parser.add_argument(
         "--gpu", action="store_true", help="Install the CUDA learning/generation stack"
     )
+    parser.add_argument(
+        "--voice",
+        action="store_true",
+        help="Install optional pretrained speech and OpenVoice libraries",
+    )
     args = parser.parse_args()
     if not (3, 12) <= sys.version_info[:2] <= (3, 13):
         raise SystemExit(
@@ -29,6 +34,12 @@ def main():
         flush=True,
     )
     subprocess.run([str(python), "-m", "pip", "install", "-r", str(dependencies)], check=True)
+    if args.voice:
+        subprocess.run(
+            [str(python), "-m", "pip", "install", "-r", str(root / "requirements-voice.txt")],
+            check=True,
+        )
+        subprocess.run([str(python), str(root / "scripts/install-voice-backend.py")], check=True)
     print("Installed. Run Start-Windows.bat or ./start.sh. Data is saved in data/.")
 
 

@@ -4,9 +4,11 @@ echo DeeL Pyess - Installer
 echo Python 3.12 or 3.13 is required.
 echo [1] Install application only
  echo [2] Install GPU learning and generation
-set /p studio_mode=Choose 1 or 2 (default 1):
+echo [3] Install GPU, Japanese speech and voice features
+set /p studio_mode=Choose 1, 2 or 3 (default 1):
 set studio_gpu=
 if "%studio_mode%"=="2" set studio_gpu=--gpu
+if "%studio_mode%"=="3" set studio_gpu=--gpu --voice
 where py >nul 2>nul
 if errorlevel 1 goto use_python
 py -3.12 --version >nul 2>nul

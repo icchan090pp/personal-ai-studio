@@ -49,7 +49,7 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
-            page.on("requestfailed", lambda req: errors.append(req.url))
+            page.on("requestfailed", lambda req: errors.append(f"{req.url}: {req.failure}"))
             page.on("response", lambda res: errors.append(res.url) if res.status >= 400 else None)
             page.goto(f"http://127.0.0.1:{port}/")
             expect(page.get_by_role("heading", name="あなたの世界を、 モデルに。")).to_be_visible()
@@ -76,6 +76,9 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#folder-upload")).to_have_attribute("webkitdirectory", "")
             page.locator("#model-level").select_option("excellent")
             expect(page.locator("#steps")).to_have_value("2000")
+            page.locator("#model-level").select_option("ultra")
+            expect(page.locator("#steps")).to_have_value("5000")
+            expect(page.locator("#assistant-model option")).to_have_count(2)
             page.locator("#training-instruction").fill("watercolor texture")
             page.locator("#send-training-chat").click()
             expect(page.locator("#training-chat-history")).to_contain_text("watercolor texture")
@@ -92,6 +95,12 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#mode-help")).to_contain_text("環境音")
             page.locator("#training-target").select_option("video")
             expect(page.locator("#mode-help")).to_contain_text("CogVideoX")
+            page.locator("#training-target").select_option("voice")
+            expect(page.locator("#mode-help")).to_contain_text("特徴を抽出")
+            expect(page.locator("#extract-video-audio")).to_be_visible()
+            page.locator("#extract-video-audio").check()
+            page.locator("#collection-media").select_option("audio")
+            expect(page.locator("#collection-media")).to_have_value("audio")
             page.locator("#training-target").select_option("image")
             page.get_by_role("button", name="AIルールの設定").click()
             expect(page.locator("#rules-prompt")).to_have_value("")
@@ -112,6 +121,9 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.get_by_role("status")).to_have_text(
                 "コースの進捗・実験ノートを保存しました。"
             )
+            page.get_by_role("button", name="ギャラリー").click()
+            expect(page.locator("#empty-gallery")).to_be_visible()
+            page.get_by_role("button", name="モデルを育てる").click()
             pid = page.locator("#projects").input_value()
             with sqlite3.connect(tmp_path / "data/studio.sqlite3") as db:
                 db.execute(
@@ -123,6 +135,13 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
                         ),
                     ),
                 )
+                db.execute(
+                    "INSERT INTO jobs(id,project_id,kind,status,config) VALUES('audio-preview', ?, 'audio', 'completed', ?)",
+                    (pid, json.dumps({"audio_model": "kokoro"})),
+                )
+                audio_folder = tmp_path / "data/jobs/audio-preview"
+                audio_folder.mkdir(parents=True)
+                (audio_folder / "output.wav").write_bytes(sound.read_bytes())
                 db.executemany(
                     "INSERT INTO training_metrics VALUES(?,?,?,?,?,?)",
                     [
@@ -135,8 +154,27 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#metric-chart")).to_have_attribute(
                 "aria-label", "学習重みの大きさ（L2）の棒グラフ。ステップ1: 3.50、ステップ10: 3.60"
             )
+            page.get_by_role("button", name="モデルを育てる").click()
+            page.locator("#reset-training").click()
+            expect(page.get_by_role("status")).to_contain_text("学習をリセットしました（1件）")
+            expect(page.locator("#image-count")).to_have_text("1 / 100枚")
             page.get_by_role("button", name="作品をつくる").click()
             expect(page.locator("#generation-form")).to_be_visible()
+            expect(page.locator("#preview audio")).to_be_visible()
+            page.wait_for_function("document.querySelector('#preview audio').readyState >= 1")
+            assert page.locator("#preview audio").evaluate("audio=>audio.duration>=1")
+            preview_audio = page.locator("#preview audio").element_handle()
+            expect(page.locator("#public-model option")).to_have_count(5)
+            page.locator("#public-model").select_option("ltx")
+            expect(page.get_by_label("動画", exact=True)).to_be_checked()
+            page.locator("#public-model").select_option("sdxl")
+            expect(page.get_by_label("画像", exact=True)).to_be_checked()
+            page.locator("#public-model").select_option("")
+            page.locator("#audio-model").select_option("kokoro")
+            expect(page.get_by_label("音声", exact=True)).to_be_checked()
+            expect(page.locator("#use-voice")).to_be_visible()
+            page.get_by_label("画像", exact=True).check()
+            expect(page.locator("#audio-model")).to_have_value("")
             page.locator("#output-resolution").select_option("custom")
             expect(page.locator("#output-resolution")).to_have_value("custom")
             page.locator("#output-resolution").select_option("4k")
@@ -144,13 +182,15 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.get_by_label("動画", exact=True).check()
             expect(page.locator("#source-label")).to_be_visible()
             page.get_by_role("button", name="ギャラリー").click()
-            expect(page.locator("#empty-gallery")).to_be_visible()
+            expect(page.locator("#gallery-items audio")).to_have_count(1)
+            expect(page.locator("#gallery-items")).to_contain_text("Kokoro")
             page.get_by_role("button", name="モデルを育てる").click()
             sample_folder = tmp_path / "dataset"
             sample_folder.mkdir()
             (sample_folder / "folder-image.png").write_bytes(png("blue"))
             page.locator("#folder-upload").set_input_files(str(sample_folder))
             expect(page.locator("#image-count")).to_have_text("2 / 100枚")
+            assert preview_audio.evaluate("audio=>audio.isConnected")
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert page.locator("#images img").first.evaluate(
                 "img => img.complete && img.naturalWidth > 0"
@@ -168,9 +208,16 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-instructions")).to_contain_text("./install.sh --gpu")
             page.locator('[data-os="windows"]').click()
             expect(page.locator("#os-instructions")).to_contain_text("Install-Windows.bat")
-            assert page.locator('a[href$="DeeL-Pyess-v0.1.0.zip"]').count() >= 1
+            assert page.locator('a[href$="DeeL-Pyess-v0.1.1.zip"]').count() >= 1
             page.locator(".usage-screen img").scroll_into_view_if_needed()
             expect(page.locator(".usage-screen img")).to_be_visible()
+            for screenshot in page.locator("img").all():
+                screenshot.scroll_into_view_if_needed()
+                page.wait_for_function(
+                    "image=>image.complete && image.naturalWidth>0",
+                    arg=screenshot.element_handle(),
+                    timeout=15000,
+                )
             assert page.locator(".usage-screen img").evaluate(
                 "image=>image.complete && image.naturalWidth>0"
             )

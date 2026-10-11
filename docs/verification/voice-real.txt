@@ -1,0 +1,3 @@
+Actual Kokoro Japanese synthesis passed.
+Actual OpenVoice speaker feature extraction passed.
+Actual OpenVoice conversion and pitch control passed.

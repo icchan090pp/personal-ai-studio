@@ -85,7 +85,7 @@ def test_training_boundaries(field, value, valid):
     [
         ("kind", "image", True),
         ("kind", "video", True),
-        ("kind", "audio", False),
+        ("kind", "sound", False),
         ("kind", "", False),
         ("kind", None, False),
         ("prompt", "", False),
@@ -254,6 +254,12 @@ def test_second_job_does_not_overlap(studio, monkeypatch):
     assert client.post(f"/api/projects/{pid}/train", json={}).status_code == 202
     assert client.post(f"/api/projects/{pid}/train", json={}).status_code == 409
     assert len(client.get(f"/api/projects/{pid}/jobs").json()) == 1
+    before = client.get(f"/api/projects/{pid}/images").json()
+    assert client.post(f"/api/projects/{pid}/training/reset", json={}).json()["reset_count"] == 1
+    assert client.get(f"/api/projects/{pid}/jobs").json()[0]["status"] == "cancelled"
+    assert client.get(f"/api/projects/{pid}/images").json() == before
+    assert client.post(f"/api/projects/{pid}/train", json={}).status_code == 202
+    assert client.post("/api/projects/missing/training/reset", json={}).status_code == 404
 
 
 def test_worker_failure_records_error_without_marking_completed(studio, monkeypatch):
@@ -279,6 +285,8 @@ def test_worker_failure_records_error_without_marking_completed(studio, monkeypa
 
 
 def test_worker_rejects_success_exit_without_output(studio, monkeypatch):
+    import subprocess
+    import sys
     from types import SimpleNamespace
 
     from fastapi.testclient import TestClient
@@ -286,9 +294,11 @@ def test_worker_rejects_success_exit_without_output(studio, monkeypatch):
     client, root = studio
     gpu_readiness_only(monkeypatch)
     pid = ready_dataset(client)
+    real_popen = subprocess.Popen
     # Controlled process exit tests the artifact guard, not model behavior.
     monkeypatch.setattr(
-        "studio.app.subprocess.run", lambda *args, **kwargs: SimpleNamespace(returncode=0)
+        "studio.app.subprocess.Popen",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, wait=lambda **kw: 0, poll=lambda: 0),
     )
     with TestClient(create_app(root, run_workers=True)) as running:
         response = running.post(f"/api/projects/{pid}/train", json={"steps": 10})
@@ -301,3 +311,22 @@ def test_worker_rejects_success_exit_without_output(studio, monkeypatch):
             time.sleep(0.05)
         assert job["status"] == "failed"
         assert "出力ファイル" in job["error"]
+        assert (
+            running.post(f"/api/projects/{pid}/training/reset", json={}).json()["reset_count"] == 1
+        )
+        children = []
+
+        def sleeper(*args, **kwargs):
+            child = real_popen([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+            children.append(child)
+            return child
+
+        monkeypatch.setattr("studio.app.subprocess.Popen", sleeper)
+        response = running.post(f"/api/projects/{pid}/train", json={"steps": 10})
+        deadline = time.monotonic() + 5
+        while not children and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert children
+        assert running.post(f"/api/projects/{pid}/training/reset", json={}).status_code == 200
+        assert children[0].poll() is not None
+        assert running.get(f"/api/projects/{pid}/jobs").json()[0]["status"] == "cancelled"

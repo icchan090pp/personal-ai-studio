@@ -70,8 +70,63 @@ def execute(root, job_id):
 
     torch.manual_seed(config["seed"])
     random.seed(config["seed"])
-    if not torch.cuda.is_available():
+    cpu_voice = job["kind"] == "voice_train" or (
+        job["kind"] == "audio" and config.get("audio_model") == "kokoro"
+    )
+    if cpu_voice and not torch.cuda.is_available():
+        torch.set_num_threads(2)
+    if not cpu_voice and not torch.cuda.is_available():
         raise RuntimeError("CUDA GPU is required")
+
+    def public_audio(path):
+        import gc
+
+        from studio.audio_models import generate_audio
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        if config.get("voice_job_id"):
+            card = json.loads(
+                (root / "jobs" / config["voice_job_id"] / "voice-card.json").read_text()
+            )
+            config.update(card.get("controls", {}))
+
+        generate_audio(config, path)
+        if config.get("voice_job_id"):
+            from studio.voice import apply_voice
+
+            apply_voice(path, root / "jobs" / config["voice_job_id"] / "speaker.pt")
+            from studio.voice import adjust_pitch
+
+            adjust_pitch(path, config.get("pitch_semitones", 0))
+
+    if job["kind"] == "voice_train":
+        from studio.voice import learn_voice
+
+        learn_voice(
+            [
+                root / "projects" / project["id"] / "media" / f"{row['id']}.wav"
+                for row in config["media"]
+            ],
+            folder,
+            progress,
+            config.get("instruction", ""),
+        )
+        return
+    if job["kind"] == "audio":
+        public_audio(folder / "output.wav")
+        return
+    if config.get("public_model"):
+        from studio.public_models import generate_public
+
+        generate_public(config, folder, callback)
+        if config.get("with_audio"):
+            from studio.sound import mux_audio
+
+            public_audio(folder / "sound.wav")
+            mux_audio(folder / "output.mp4", folder / "sound.wav")
+        return
     if job["kind"] == "audio_train":
         from studio.sound import read_audio, train_sound
 
@@ -120,7 +175,14 @@ def execute(root, job_id):
             callback_on_step_end=callback,
         ).frames[0]
         save_video(frames, folder / "output.mp4", config.get("resolution", "720p"), fps=8)
-        if config.get("with_audio"):
+        if config.get("with_audio") and config.get("audio_model"):
+            from studio.sound import mux_audio
+
+            del pipe
+            torch.cuda.empty_cache()
+            public_audio(folder / "sound.wav")
+            mux_audio(folder / "output.mp4", folder / "sound.wav")
+        elif config.get("with_audio"):
             from studio.sound import generate_sound, mux_audio
 
             with sqlite3.connect(root / "studio.sqlite3") as db:

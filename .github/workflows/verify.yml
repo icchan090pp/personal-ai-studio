@@ -1,5 +1,5 @@
 name: Verify
-on: [push, pull_request, workflow_dispatch]
+on: [push, pull_request, workflow_dispatch, workflow_call]
 jobs:
   verify:
     runs-on: ubuntu-latest

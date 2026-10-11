@@ -105,7 +105,7 @@ class MediaPage(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag in {"img", "video", "source"}:
+        if tag in {"img", "video", "audio", "source"}:
             source = attrs.get("src") or attrs.get("data-src")
             if source:
                 self.media.append((source, attrs.get("alt", "")))
@@ -114,7 +114,20 @@ class MediaPage(HTMLParser):
             if (
                 urlsplit(url)
                 .path.lower()
-                .endswith((".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm"))
+                .endswith(
+                    (
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                        ".webp",
+                        ".mp4",
+                        ".webm",
+                        ".wav",
+                        ".mp3",
+                        ".ogg",
+                        ".m4a",
+                    )
+                )
             ):
                 self.media.append((url, attrs.get("title", "")))
             else:
@@ -126,7 +139,13 @@ def discover(options, fetcher=fetch_public):
     query = options.get("query", "").strip()
     if options.get("provider") == "commons":
         search = query + (
-            " filetype:video" if options.get("media") == "video" else " filetype:bitmap"
+            " filetype:video"
+            if options.get("media") == "video"
+            else " filetype:audio"
+            if options.get("media") == "audio"
+            else ""
+            if options.get("media") == "all"
+            else " filetype:bitmap"
         )
         url = (
             "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url%7Cextmetadata&gsrsearch="
@@ -163,7 +182,7 @@ def discover(options, fetcher=fetch_public):
             if page == first:
                 raise
             continue
-        if content_type.startswith(("image/", "video/")):
+        if content_type.startswith(("image/", "video/", "audio/")):
             return [{"url": final, "page": final, "caption": query, "license": ""}]
         parser = MediaPage()
         parser.feed(data.decode("utf-8", errors="replace"))
@@ -194,6 +213,10 @@ def extract_media(data, content_type, kind):
             path = Path(tmp) / "input.mp4"
             path.write_bytes(data)
             with imageio.get_reader(path) as reader:
+                metadata = reader.get_meta_data()
+                width, height = metadata["size"]
+                if width > 1920 or height > 1080:
+                    raise ValueError("収集する動画は1920×1080以下にしてください")
                 frames = []
                 duration = min(float(reader.get_meta_data().get("duration", 3)), 30)
                 fps = float(reader.get_meta_data().get("fps", 8))
@@ -219,6 +242,28 @@ def collect(options, fetcher=fetch_public):
             break
         try:
             data, content_type, final = fetcher(item["url"], LIMIT)
+            kind = options.get("media", "both")
+            if kind in {"audio", "all"} and content_type.startswith(("audio/", "video/")):
+                from studio.sound import read_audio
+
+                with tempfile.TemporaryDirectory(prefix="deel-web-audio-") as tmp:
+                    path = Path(tmp) / (
+                        "input.mp4" if content_type.startswith("video/") else "input.wav"
+                    )
+                    path.write_bytes(data)
+                    try:
+                        waveform = read_audio(path)
+                        rows.append({**item, "url": final, "image": None, "audio_data": waveform})
+                    except Exception:
+                        if kind == "audio":
+                            raise
+                        errors.append(
+                            "音声トラックを取得できませんでした。動画・画像のみ取り込みます"
+                        )
+                if kind == "audio" or len(rows) >= options.get("max_files", 10):
+                    continue
+            if content_type.startswith("audio/") or kind == "audio":
+                continue
             for frame_index, frame in enumerate(
                 extract_media(data, content_type, options.get("media", "both"))
             ):

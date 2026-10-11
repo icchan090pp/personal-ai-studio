@@ -1,0 +1,3 @@
+CPU app worker Japanese WAV generation/download passed.
+CPU app reference voice feature import/export and saved instruction passed.
+CPU app trained speaker style synthesis and safe reset passed.

@@ -1,4 +1,5 @@
 {
+  "version": "v0.1.1",
   "unique_cases": 100,
   "consecutive_runs": 5,
   "total_executions": 500,
@@ -9,9 +10,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 31.227,
-      "timestamp": "2026-10-11T18:07:31.636728+00:00",
-      "report_sha256": "e62265ee7292bd9440f56d2af60d0ead8225fb0bb3365536924bf36bb3998394"
+      "seconds": 35.432,
+      "timestamp": "2026-10-11T19:01:40.774243+00:00",
+      "report_sha256": "f76b3d50080a18bf36c30e41064f05ac5ccc43670da5f7491905c112e0a9128c"
     },
     {
       "run": 2,
@@ -19,9 +20,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 31.331,
-      "timestamp": "2026-10-11T18:08:07.147918+00:00",
-      "report_sha256": "c6a204a81aef2ef6fa09f6357a291365e0d68fb5855bfa056b4ac119f7c6f501"
+      "seconds": 34.224,
+      "timestamp": "2026-10-11T19:02:20.805660+00:00",
+      "report_sha256": "692f577b1303a367db144a9f73c9bda92673d6a4d68e65a6684c8ec91efce693"
     },
     {
       "run": 3,
@@ -29,9 +30,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 30.985,
-      "timestamp": "2026-10-11T18:08:42.581642+00:00",
-      "report_sha256": "2da738b87f38061decd58f992414bee1104cf7a2197ca82f7538a820218c173b"
+      "seconds": 34.793,
+      "timestamp": "2026-10-11T19:02:59.452468+00:00",
+      "report_sha256": "23eaaeddd9fa087bd570c32a5ea81f0ec56121a539f40af9e0f2419f24047eca"
     },
     {
       "run": 4,
@@ -39,9 +40,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 31.712,
-      "timestamp": "2026-10-11T18:09:17.764473+00:00",
-      "report_sha256": "56a236000dfcf6d9e41864880b123b9b60b7ef905eee00e76b306bcc53b34a23"
+      "seconds": 34.402,
+      "timestamp": "2026-10-11T19:03:38.827496+00:00",
+      "report_sha256": "09bd4875a4f31a8a7cf3eef4cbb85b69cfe1f5613e9dc2ccc979d93456b45748"
     },
     {
       "run": 5,
@@ -49,12 +50,17 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 31.343,
-      "timestamp": "2026-10-11T18:09:54.017045+00:00",
-      "report_sha256": "0b5e2af6aed79ecc8bd62d408d8a09a7c38a1dd5a2f650c3f2224b492dcb7ecc"
+      "seconds": 34.324,
+      "timestamp": "2026-10-11T19:04:17.703395+00:00",
+      "report_sha256": "33b1b61885f8104d649eb2df973a998e9b93a7d0395f27d02efbb4060e9388c0"
     }
   ],
   "additional_manual_checks": [
+    "actual Kokoro Japanese synthesis on CPU",
+    "actual OpenVoice reference extraction, conversion and pitch control on CPU",
+    "real app subprocess workers: WAV generation, upload, voice profile, saved instructions, download",
+    "native audio playback and retained player during dataset refresh in desktop/mobile Chromium",
+    "compatible optional speech/voice installation and pip check",
     "fresh Linux ZIP install/start/stop",
     "paired LAN authenticated mobile browser",
     "live Wikimedia Commons search"

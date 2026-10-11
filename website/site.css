@@ -6,3 +6,7 @@
 
 .star-symbol{display:inline-block;width:1em;height:1em;vertical-align:-.12em;fill:currentColor}.logo .star-symbol{color:#438dff;width:1.2em;height:1.2em}.art-core .star-symbol{color:#58a6ff}
 .course{color:#e7eefb}.course-top h2,.curriculum h3{color:#e7eefb}.course-top>p,.curriculum p{color:#9cb3d4}.curriculum article>span{color:#6baaff}.course-foot{color:#a8c2e6}
+
+.level-grid{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:600px){.level-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.voice-screen{margin:35px 0;color:#d9e8ff}.voice-screen img{display:block;width:100%;height:auto;border:1px solid #294768;border-radius:12px}.voice-screen>p{max-width:900px;color:#9bb1cd}

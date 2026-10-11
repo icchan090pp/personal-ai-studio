@@ -17,7 +17,7 @@ from tests.test_studio import png, project
 from tests.test_studio_matrix import gpu_readiness_only, ready_dataset
 
 
-def test_two_model_catalog(studio):
+def test_two_model_catalog(studio, monkeypatch):
     client, _root = studio
     models = client.get("/api/models").json()
     assert len(models) == 2
@@ -25,7 +25,131 @@ def test_two_model_catalog(studio):
     assert models[0]["trainable"] is True
     assert models[1]["trainable"] is True
     assert all(model["weights_url"].endswith(model["id"]) for model in models)
+    audio_models = client.get("/api/audio-models").json()
+    assert {m["key"] for m in audio_models} == {"audioldm2", "kokoro"}
+    assert all(m["license"] and m["revision"] and not m["trainable"] for m in audio_models)
+    public = client.get("/api/public-models").json()
+    assert len(public) == 4 and len({m["id"] for m in public}) == 4
+    assert {m["kind"] for m in public} == {"image", "video"}
+    assert all(not m["trainable"] and m["license"] and m["revision"] for m in public)
+    import diffusers
+
+    for model in public:
+        assert hasattr(diffusers, model["pipeline"])
+
+    from types import SimpleNamespace
+
+    from studio.public_models import generate_public
+
+    received = []
+
+    class ControlledPipeline:
+        vae = SimpleNamespace(enable_tiling=lambda: None)
+
+        def enable_model_cpu_offload(self):
+            pass
+
+        def __call__(self, **kwargs):
+            received.append(kwargs)
+            image = Image.new("RGB", (64, 64), "blue")
+            return SimpleNamespace(images=[image], frames=[[image] * 49])
+
+    # Model weights are unavailable on this CPU runner. Exercise all four dispatch
+    # contracts and real image/video exports, without claiming quality verification.
+    for model in public:
+
+        def load(model_id, revision, torch_dtype):
+            assert model_id == model["id"] and revision == model["revision"]
+            return ControlledPipeline()
+
+        monkeypatch.setattr(getattr(diffusers, model["pipeline"]), "from_pretrained", load)
+        folder = _root / model["key"]
+        folder.mkdir()
+        generate_public(
+            {
+                "public_model": model["key"],
+                "prompt": "landscape",
+                "negative_prompt": "blur",
+                "inference_steps": 200,
+                "guidance_scale": 8.5,
+                "seed": 42,
+                "resolution": "native",
+            },
+            folder,
+            lambda *a: None,
+        )
+        assert received[-1]["num_inference_steps"] == 200
+        assert received[-1]["guidance_scale"] in {3.0, 4.5, 5.0}
+        assert (folder / ("output.mp4" if model["kind"] == "video" else "output.png")).is_file()
     # All six modes have a functioning validation path, and unknown modes fail.
+    pid = project(client)
+    from studio import assistant as assistant_module
+
+    calls = []
+
+    class LocalConnection:
+        def __init__(self, host, port, timeout):
+            assert host == "127.0.0.1" and port == 11434
+
+        def request(self, method, path, body, headers):
+            calls.append(json.loads(body))
+            assert method == "POST" and path == "/api/chat"
+
+        def getresponse(self):
+            return self
+
+        status = 200
+
+        def read(self, limit):
+            return b'{"message":{"content":"watercolor texture"}}'
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(assistant_module.http.client, "HTTPConnection", LocalConnection)
+    for model in ("gpt-oss:20b", "gpt-oss:120b"):
+        response = client.post(
+            f"/api/projects/{pid}/assistant",
+            json={"prompt": "help", "model": model, "level": "ultra"},
+        )
+        assert response.json()["answer"] == "watercolor texture"
+        assert calls[-1]["think"] == "high" and calls[-1]["model"] == model
+    assert (
+        client.post(
+            f"/api/projects/{pid}/assistant", json={"prompt": "help", "model": "unknown"}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"/api/projects/{pid}/generate",
+            json={"prompt": "test", "kind": "video", "public_model": "sdxl"},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"/api/projects/{pid}/generate", json={"prompt": "test", "public_model": "unknown"}
+        ).status_code
+        == 422
+    )
+
+    gpu_readiness_only(monkeypatch)
+    for model in public:
+        response = client.post(
+            f"/api/projects/{pid}/generate",
+            json={
+                "prompt": "landscape",
+                "public_model": model["key"],
+                "kind": model["kind"],
+                "level": "ultra",
+            },
+        )
+        assert response.status_code == 202
+        config = json.loads(response.json()["config"])
+        assert config["inference_steps"] == 200 and config["public_model"] == model["key"]
+        with sqlite3.connect(_root / "studio.sqlite3") as db:
+            db.execute("UPDATE jobs SET status='completed' WHERE id=?", (response.json()["id"],))
     pid = project(client)
     for mode in (
         "supervised",
@@ -69,7 +193,7 @@ def test_two_model_catalog(studio):
     )
     assert client.get(f"/api/projects/{pid}/metrics").json()["points"] == []
     system = client.get("/api/system").json()
-    assert set(system["levels"]) == {"normal", "power", "excellent"}
+    assert set(system["levels"]) == {"normal", "power", "excellent", "ultra"}
     for level in system["levels"]:
         response = client.patch(f"/api/projects/{pid}/level", json={"level": level})
         assert response.status_code == 200 and response.json()["preset"] == system["levels"][level]
@@ -368,7 +492,7 @@ def test_reward_training_resumes_matching_base_and_requires_feedback(studio, mon
         ).status_code
         == 422
     )
-    for level in ("normal", "power", "excellent"):
+    for level in ("normal", "power", "excellent", "ultra"):
         for kind in ("image", "video"):
             with sqlite3.connect(root / "studio.sqlite3") as db:
                 db.execute("UPDATE jobs SET status='failed' WHERE status='queued'")
@@ -385,7 +509,10 @@ def test_reward_training_resumes_matching_base_and_requires_feedback(studio, mon
             assert response.status_code == 202
             config = json.loads(response.json()["config"])
             assert config["resolution"] == "4k" and config["level"] == level
-            assert config["inference_steps"] == {"normal": 20, "power": 35, "excellent": 50}[level]
+            assert (
+                config["inference_steps"]
+                == {"normal": 20, "power": 35, "excellent": 50, "ultra": 200}[level]
+            )
     assert (
         client.post(
             f"/api/projects/{pid}/generate", json={"prompt": "test", "resolution": "8k"}
@@ -585,8 +712,171 @@ def test_real_video_encoder_preserves_frames_and_timing(tmp_path):
             with sqlite3.connect(tmp_path / "media-app/studio.sqlite3") as db:
                 db.execute("UPDATE jobs SET status='failed' WHERE status='queued'")
         assert len(client.get(f"/api/projects/{pid}/media").json()) == 6
+        extracted = client.post(
+            f"/api/projects/{pid}/media",
+            data={"kind": "video", "extract_audio": "true", "group_name": "voice-reference"},
+            files={"files": ("voice-video.mp4", path.read_bytes(), "video/mp4")},
+        )
+        assert extracted.status_code == 201
+        assert len(extracted.json()) == 8
+        assert len([r for r in extracted.json() if r["kind"] == "audio"]) == 4
+        assert len([r for r in extracted.json() if r["kind"] == "video"]) == 4
+        with patch("studio.app.importlib.util.find_spec", return_value=True):
+            voice = client.post(
+                f"/api/projects/{pid}/train",
+                json={
+                    "target": "voice",
+                    "mode": "imitation",
+                    "instruction": "ゆっくり、高めの声",
+                    "steps": 10,
+                },
+            )
+        assert voice.status_code == 202 and voice.json()["kind"] == "voice_train"
+        voice_config = json.loads(voice.json()["config"])
+        assert (
+            len(voice_config["media"]) == 4 and voice_config["instruction"] == "ゆっくり、高めの声"
+        )
+        assert (
+            client.post(f"/api/projects/{pid}/training/reset", json={}).json()["reset_count"] == 3
+        )
+        with patch("studio.app.importlib.util.find_spec", return_value=True):
+            speech = client.post(
+                f"/api/projects/{pid}/generate",
+                json={
+                    "kind": "audio",
+                    "audio_model": "kokoro",
+                    "prompt": "こんにちは。",
+                    "level": "ultra",
+                },
+            )
+        assert speech.status_code == 202
+        assert json.loads(speech.json()["config"])["inference_steps"] == 200
+        assert (
+            client.post(
+                f"/api/projects/{pid}/generate", json={"kind": "audio", "prompt": "hello"}
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                f"/api/projects/{pid}/generate",
+                json={
+                    "kind": "audio",
+                    "audio_model": "kokoro",
+                    "use_voice": True,
+                    "prompt": "hello",
+                },
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                f"/api/projects/{pid}/generate",
+                json={
+                    "kind": "audio",
+                    "audio_model": "audioldm2",
+                    "use_voice": True,
+                    "prompt": "hello",
+                },
+            ).status_code
+            == 422
+        )
         assert client.get("/api/media/missing/file").status_code == 404
         assert client.patch("/api/media/missing", json={"caption": "x"}).status_code == 404
+
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from diffusers import AudioLDM2Pipeline
+
+    from studio.audio_models import AUDIO_MODELS, generate_audio
+    from studio.voice import adjust_pitch, instruction_controls, learn_voice
+
+    audio_calls = []
+
+    class ControlledAudioPipeline:
+        def enable_model_cpu_offload(self):
+            pass
+
+        def __call__(self, **kwargs):
+            audio_calls.append(kwargs)
+            return SimpleNamespace(audios=[signal])
+
+    with patch.object(
+        AudioLDM2Pipeline, "from_pretrained", return_value=ControlledAudioPipeline()
+    ) as loader:
+        output = tmp_path / "public-sound.wav"
+        generate_audio(
+            {
+                "audio_model": "audioldm2",
+                "prompt": "waterfall",
+                "audio_prompt": "",
+                "negative_prompt": "noise",
+                "inference_steps": 200,
+                "seed": 42,
+            },
+            output,
+        )
+        assert loader.call_args.kwargs["revision"] == AUDIO_MODELS["audioldm2"]["revision"]
+        assert len(read_audio(output)) == 16000
+        assert (
+            audio_calls[0]["num_inference_steps"] == 200 and audio_calls[0]["prompt"] == "waterfall"
+        )
+    controls = instruction_controls("ゆっくり、高めの声")
+    assert controls == {"speech_speed": 0.8, "pitch_semitones": 2}
+    assert instruction_controls("fast lower pitch") == {"speech_speed": 1.2, "pitch_semitones": -2}
+    assert instruction_controls("自由な説明") == {"speech_speed": 1.0, "pitch_semitones": 0}
+    adjusted = tmp_path / "adjusted.wav"
+    adjusted.write_bytes(sound.read_bytes())
+    adjust_pitch(adjusted, 2)
+    assert 15000 <= len(read_audio(adjusted)) <= 16500
+    voice_folder = tmp_path / "voice-model"
+    voice_folder.mkdir()
+
+    class FrozenConverter:
+        def extract_se(self, paths, destination):
+            assert len(paths) == 3 and all(Path(p).is_file() for p in paths)
+            torch.save(torch.tensor([0.2, 0.3]), destination)
+
+    with patch("studio.voice.converter", return_value=FrozenConverter()):
+        learn_voice([sound] * 3, voice_folder, lambda value: None, "ゆっくり、高めの声")
+    card = json.loads((voice_folder / "voice-card.json").read_text())
+    assert card["controls"] == controls and card["files"] == 3
+    assert (voice_folder / "adapter.zip").is_file()
+
+    # Extract actual WAV and AAC tracks from a bounded public-site collector.
+    def site_audio_fetch(url, max_bytes):
+        if url.endswith("site"):
+            return (
+                b'<audio src="/sound.wav"></audio><video src="/voice.mp4"></video>',
+                "text/html",
+                url,
+            )
+        return (
+            (sound.read_bytes(), "audio/wav", url)
+            if url.endswith("wav")
+            else (path.read_bytes(), "video/mp4", url)
+        )
+
+    audio_rows, errors = collect(
+        {"provider": "site", "url": "https://example.org/site", "media": "audio", "max_files": 10},
+        site_audio_fetch,
+    )
+    assert not errors and len(audio_rows) == 2
+    assert all(r["image"] is None and len(r["audio_data"]) >= 16000 for r in audio_rows)
+    silent = tmp_path / "silent.mp4"
+    export_to_video(frames, str(silent), fps=8)
+    silent_rows, warnings = collect(
+        {
+            "provider": "site",
+            "url": "https://example.org/silent.mp4",
+            "media": "all",
+            "max_files": 10,
+        },
+        lambda url, max_bytes: (silent.read_bytes(), "video/mp4", url),
+    )
+    assert len(silent_rows) == 3 and warnings
+    assert all(row["image"] is not None for row in silent_rows)
 
     # Background collector persists real video clips, frames and source URLs.
     import time
@@ -601,7 +891,14 @@ def test_real_video_encoder_preserves_frames_and_timing(tmp_path):
                     "page": "https://example.org/gallery",
                     "license": "CC0",
                     "video_data": path.read_bytes(),
-                }
+                },
+                {
+                    "image": None,
+                    "audio_data": read_audio(sound),
+                    "url": "https://example.org/sound.wav",
+                    "page": "https://example.org/gallery",
+                    "license": "CC0",
+                },
             ],
             [],
         ),
@@ -619,8 +916,11 @@ def test_real_video_encoder_preserves_frames_and_timing(tmp_path):
                 if run["status"] != "running":
                     break
                 time.sleep(0.02)
-            assert run["status"] == "completed" and run["imported"] == 1
+            assert run["status"] == "completed" and run["imported"] == 2
             images = client.get(f"/api/projects/{pid}/images").json()
             assert images[0]["source_page"] == "https://example.org/gallery"
             assert client.get(f"/api/images/{images[0]['id']}/source").json()["license"] == "CC0"
-            assert client.get(f"/api/projects/{pid}/media").json()[0]["kind"] == "video"
+            collected_media = client.get(f"/api/projects/{pid}/media").json()
+            assert collected_media[0]["kind"] == "video"
+            assert collected_media[1]["kind"] == "audio"
+            assert collected_media[1]["source_page"] == "https://example.org/gallery"
