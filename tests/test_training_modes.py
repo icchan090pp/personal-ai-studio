@@ -29,7 +29,8 @@ def test_two_model_catalog(studio, monkeypatch):
     assert {m["key"] for m in audio_models} == {"audioldm2", "kokoro"}
     assert all(m["license"] and m["revision"] and not m["trainable"] for m in audio_models)
     public = client.get("/api/public-models").json()
-    assert len(public) == 4 and len({m["id"] for m in public}) == 4
+    assert len(public) == 5 and len({m["id"] for m in public}) == 5
+    assert {m["key"] for m in public} == {"tiny", "sdxl", "ssd", "pixart", "ltx"}
     assert {m["kind"] for m in public} == {"image", "video"}
     assert all(not m["trainable"] and m["license"] and m["revision"] for m in public)
     import diffusers
@@ -56,7 +57,7 @@ def test_two_model_catalog(studio, monkeypatch):
 
     # Model weights are unavailable on this CPU runner. Exercise all four dispatch
     # contracts and real image/video exports, without claiming quality verification.
-    for model in public:
+    for model in [entry for entry in public if entry["key"] != "tiny"]:
 
         def load(model_id, revision, torch_dtype):
             assert model_id == model["id"] and revision == model["revision"]
@@ -134,6 +135,7 @@ def test_two_model_catalog(studio, monkeypatch):
         == 422
     )
 
+    assert client.get("/api/system").json()["hardware"]["cpu_ready"] is True
     gpu_readiness_only(monkeypatch)
     for model in public:
         response = client.post(

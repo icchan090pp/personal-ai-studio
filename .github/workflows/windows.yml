@@ -19,12 +19,31 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $destination = Join-Path $env:RUNNER_TEMP 'DeeL 試験 with spaces'
-          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe'
+          $previous = Join-Path $env:RUNNER_TEMP 'previous-setup.exe'
+          Invoke-WebRequest 'https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.2/DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe' -OutFile $previous
+          if ((Get-FileHash $previous -Algorithm SHA256).Hash.ToLower() -ne '6aab91f7d7f92b7d5df4f799944a1811b96633a9bdf35f16f4ce310c807e8fbe') { throw 'Previous release checksum mismatch' }
+          $oldSetup = Start-Process -FilePath $previous -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -PassThru -Wait
+          if ($oldSetup.ExitCode -ne 0) { throw 'Previous version install failed' }
+          $oldApp = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList '--smoke-test' -PassThru
+          if (-not $oldApp.WaitForExit(120000) -or $oldApp.ExitCode -ne 0) { throw 'Previous version seed failed' }
+          $database = "$env:LOCALAPPDATA/DeeL Pyess/data/studio.sqlite3"
+          $before = (Get-FileHash $database -Algorithm SHA256).Hash
+          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.3-Windows-x64.exe'
           $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
+          if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $before) { throw 'Upgrade modified user database' }
           if (-not (Test-Path "$env:APPDATA/Microsoft/Windows/Start Menu/Programs/DeeL Pyess/DeeL Pyess.lnk")) { throw 'Start menu shortcut missing' }
           & "$destination/runtime/python.exe" -m pip check
           if ($LASTEXITCODE -ne 0) { throw 'Bundled dependencies invalid' }
+          # Actually install both CPU packages and the isolated DirectML backend.
+          Push-Location $destination
+          & "$destination/runtime/python.exe" -m studio.setup_runtime --backend directml
+          if ($LASTEXITCODE -ne 0) { throw 'CPU/DirectML setup failed' }
+          & "$env:LOCALAPPDATA/DeeL Pyess/directml/Scripts/python.exe" -c "import torch, torch_directml; assert torch.__version__.startswith('2.4.1'); print('DirectML import verified')"
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated DirectML runtime failed' }
+          & "$destination/runtime/python.exe" -c "import torch; assert torch.__version__.startswith('2.7.0+cpu'); print('CPU runtime preserved')"
+          if ($LASTEXITCODE -ne 0) { throw 'DirectML altered primary Torch runtime' }
+          Pop-Location
           # Prove launching does not depend on a preinstalled Python in PATH.
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
           $env:PYTHONHOME = 'C:\Nonexistent external Python'

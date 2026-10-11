@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, field_validator
 from studio.audio_models import AUDIO_MODELS
 from studio.collection import collect, public_address
 from studio.curriculum import MODULES
+from studio.hardware import inspect_system
 from studio.presets import LEVELS
 from studio.public_models import PUBLIC_MODELS, catalog
 
@@ -55,7 +56,7 @@ class TrainingInput(BaseModel):
 
 
 class GenerationInput(BaseModel):
-    public_model: Literal["sdxl", "ssd", "pixart", "ltx"] | None = None
+    public_model: Literal["tiny", "sdxl", "ssd", "pixart", "ltx"] | None = None
     audio_model: Literal["audioldm2", "kokoro"] | None = None
     use_voice: bool = False
     resolution: Literal["native", "720p", "1080p", "1440p", "4k", "custom"] = "720p"
@@ -147,11 +148,14 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         return project
 
     def gpu_available():
-        if not all(importlib.util.find_spec(m) for m in ("torch", "diffusers", "peft")):
-            return False
-        import torch
+        try:
+            if not all(importlib.util.find_spec(m) for m in ("torch", "diffusers", "peft")):
+                return False
+            import torch
 
-        return torch.cuda.is_available()
+            return torch.cuda.is_available()
+        except (ImportError, OSError, RuntimeError):
+            return False
 
     process_guard = threading.RLock()
     active_processes = {}
@@ -195,11 +199,14 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                             != "running"
                         ):
                             continue
+                        config = json.loads(job["config"])
                         result = subprocess.Popen(
                             [
                                 sys.executable,
                                 "-m",
-                                "studio.gpu",
+                                "studio.compat"
+                                if config.get("public_model") == "tiny"
+                                else "studio.gpu",
                                 "--data",
                                 str(root),
                                 "--job",
@@ -221,7 +228,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                     if result.returncode:
                         # Keep full diagnostics local rather than exposing paths or tokens in API.
                         raise RuntimeError(
-                            "GPU処理に失敗しました。ジョブのログを確認してください。"
+                            "AI処理に失敗しました。PC環境の診断とジョブのログを確認してください。"
                         )
                     expected = {
                         "train": "adapter.zip",
@@ -333,6 +340,9 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     @app.get("/api/system")
     def system():
         return {
+            "version": "0.1.3",
+            "hardware": inspect_system(),
+            "desktop_setup": bool(os.environ.get("STUDIO_DESKTOP_COMMAND")),
             "gpu_ready": gpu_available(),
             "speech_ready": bool(importlib.util.find_spec("kokoro")),
             "voice_ready": bool(importlib.util.find_spec("openvoice")),
@@ -340,6 +350,38 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             "video_model": VIDEO_MODEL,
             "checkpoint": os.getenv("STUDIO_CHECKPOINT", BASE_MODEL),
             "levels": LEVELS,
+        }
+
+    @app.get("/api/system/hardware")
+    def hardware(refresh: bool = False):
+        if refresh:
+            inspect_system.cache_clear()
+        return inspect_system()
+
+    class SetupInput(BaseModel):
+        backend: Literal["auto", "cpu", "cuda", "directml"] = "auto"
+        voice: bool = False
+
+    @app.post("/api/system/setup", status_code=202)
+    def setup_runtime(body: SetupInput, request: Request):
+        if not request.client or request.client.host not in {"127.0.0.1", "::1"}:
+            raise HTTPException(403, "追加機能の導入は、このPCの画面から実行してください")
+        command_path = os.environ.get("STUDIO_DESKTOP_COMMAND")
+        if not command_path:
+            raise HTTPException(
+                409,
+                "Windows版DeeL Pyessの起動ウィンドウからセットアップしてください。ソース版は python -m studio.setup_runtime を実行できます。",
+            )
+        if query("SELECT id FROM jobs WHERE status IN ('queued','running')", one=True):
+            raise HTTPException(409, "実行中の学習・生成が完了してからセットアップしてください")
+        try:
+            with Path(command_path).open("x", encoding="utf-8") as stream:
+                json.dump(body.model_dump(), stream)
+        except FileExistsError:
+            raise HTTPException(409, "セットアップ要求を処理中です") from None
+        return {
+            "status": "accepted",
+            "message": "起動ウィンドウで準備を始めます。数GBのダウンロードが必要です。完了後にアプリを再起動します。",
         }
 
     @app.get("/api/course/modules")
@@ -839,10 +881,20 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         )
         if optional and not importlib.util.find_spec(optional):
             raise HTTPException(
-                503, "音声機能をインストールしてください：python install.py --gpu --voice"
+                503,
+                "『PC環境・AI機能』を開き、日本語音声・声質機能を追加してください。CPUでも利用できます。",
             )
-        if not cpu_voice and not gpu_available():
-            raise HTTPException(503, "GPU未接続です。CUDA GPUとrequirements-gpu.txtが必要です。")
+        compatible_image = kind == "image" and config.get("public_model") == "tiny"
+        if compatible_image and not inspect_system()["cpu_ready"]:
+            raise HTTPException(
+                503,
+                "『PC環境・AI機能』からこのPCのAI機能をセットアップしてください。Tiny-SDはCPUでも画像生成できます。",
+            )
+        if not cpu_voice and not compatible_image and not gpu_available():
+            raise HTTPException(
+                503,
+                "この機能にはNVIDIA CUDA GPUが必要です。AMD・Intelでは『Tiny-SD / 軽量画像』またはCPU音声を選んでください。『PC環境・AI機能』で導入・診断できます。",
+            )
         job_id = uuid.uuid4().hex
         with sqlite3.connect(db_path) as db:
             db.execute("BEGIN IMMEDIATE")
@@ -1113,6 +1165,12 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 "name", ""
             )
             row["voice_applied"] = bool(config.get("voice_job_id"))
+            execution = root / "jobs" / row["id"] / "execution.json"
+            if selected == "tiny" and row["status"] == "completed" and execution.is_file():
+                details = json.loads(execution.read_text(encoding="utf-8"))
+                row["execution_backend"] = details["backend"]
+                row["model_name"] += " / " + details["backend"].upper()
+                row["fallback_reason"] = details.get("fallback_reason")
             feedback_row = query(
                 "SELECT rating FROM images WHERE origin_job_id=?", (row["id"],), True
             )

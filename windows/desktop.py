@@ -31,6 +31,8 @@ class Application:
         self.installer = None
         self.installing = False
         self.smoke = False
+        self.command_path = self.data / f"setup-command-{os.getpid()}.json"
+        self.command_path.unlink(missing_ok=True)
         self.events = queue.Queue()
         self.closing = False
         with socket.socket() as sock:
@@ -41,14 +43,17 @@ class Application:
         self.env.update(
             STUDIO_PYTHON=str(self.python),
             STUDIO_DATA_DIR=str(self.data / "data"),
+            STUDIO_DESKTOP_COMMAND=str(self.command_path),
+            STUDIO_DML_PYTHON=str(self.data / "directml/Scripts/python.exe"),
             PYTHONUTF8="1",
             PYTHONUNBUFFERED="1",
         )
         # A user's Python configuration must not redirect the bundled interpreter.
         for key in ("PYTHONHOME", "PYTHONPATH"):
             self.env.pop(key, None)
-        root.title("DeeL Pyess")
-        root.geometry("600x360")
+        root.title("DeeL Pyess 0.1.3")
+        root.geometry("640x610")
+        root.minsize(580, 610)
         root.configure(bg="#080d16")
         tk.Label(root, text="DeeL Pyess", fg="#67b9ff", bg="#080d16", font=("Segoe UI", 26)).pack(
             pady=18
@@ -57,11 +62,28 @@ class Application:
         tk.Label(root, textvariable=self.status, fg="white", bg="#080d16", wraplength=550).pack(
             pady=8
         )
+        self.hardware = tk.StringVar(value="PCのGPUとAI機能を確認しています…")
+        tk.Label(root, textvariable=self.hardware, fg="#67b9ff", bg="#080d16", wraplength=600).pack(
+            pady=8
+        )
+        self.backend_choices = {
+            "自動選択（推奨）": "auto",
+            "AMD・Intel / DirectML": "directml",
+            "CPU互換モード": "cpu",
+            "NVIDIA / CUDA": "cuda",
+        }
+        self.backend = tk.StringVar(value="自動選択（推奨）")
+        tk.OptionMenu(root, self.backend, *self.backend_choices).pack(pady=4)
         self.buttons = []
         for text, command in (
             ("アプリを開く", self.open_app),
-            ("画像・動画の学習機能を追加", lambda: self.install(False)),
-            ("画像・動画・日本語音声・声質機能を追加", lambda: self.install(True)),
+            ("このPCのAI機能をセットアップ / 修復", lambda: self.request_install(False)),
+            ("AI機能 ＋ 日本語音声・声質機能をセットアップ", lambda: self.request_install(True)),
+            ("PC環境を再診断", self.diagnose),
+            (
+                "アプリの更新版をダウンロード",
+                lambda: webbrowser.open("https://deel-pyess.icchan.chatgpt.site/#download"),
+            ),
             ("診断ログを開く", lambda: os.startfile(self.log_path)),
         ):
             button = tk.Button(root, text=text, command=command, width=46)
@@ -130,7 +152,49 @@ class Application:
             self.status.set("アプリを再起動しています…")
             self.start()
 
-    def install(self, voice):
+    def request_install(self, voice):
+        if self.installing:
+            return
+        body = json.dumps(
+            {"backend": self.backend_choices[self.backend.get()], "voice": voice}
+        ).encode()
+        try:
+            request = urllib.request.Request(
+                self.url + "/api/system/setup",
+                data=body,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                json.load(response)
+            self.status.set("セットアップを開始します…")
+        except Exception as exc:
+            messagebox.showerror(
+                "DeeL Pyess",
+                "セットアップを開始できません。実行中の学習・生成を終了してください。\n" + str(exc),
+            )
+
+    def diagnose(self):
+        def work():
+            try:
+                with urllib.request.urlopen(
+                    self.url + "/api/system/hardware?refresh=true", timeout=45
+                ) as response:
+                    self.events.put(("hardware", json.load(response)))
+            except Exception as exc:
+                self.events.put(
+                    (
+                        "hardware",
+                        {
+                            "adapters": [],
+                            "label": "診断を完了できませんでした",
+                            "message": str(exc),
+                        },
+                    )
+                )
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def install(self, voice, backend="auto"):
         if self.installing:
             return
         self.installing = True
@@ -141,18 +205,14 @@ class Application:
 
         def work():
             try:
-                requirements = "requirements-voice.txt" if voice else "requirements-gpu.txt"
-                self.installer = self.spawn(["-m", "pip", "install", "-r", requirements])
+                arguments = ["-m", "studio.setup_runtime", "--backend", backend]
+                if voice:
+                    arguments.append("--voice")
+                self.installer = self.spawn(arguments)
                 if self.installer.wait() != 0:
                     raise RuntimeError(
                         "追加機能のインストールに失敗しました。診断ログをご確認ください。"
                     )
-                if voice:
-                    self.installer = self.spawn(["scripts/install-voice-backend.py"])
-                    if self.installer.wait() != 0:
-                        raise RuntimeError(
-                            "声質機能のインストールに失敗しました。診断ログをご確認ください。"
-                        )
                 self.events.put(("installed", None))
             except Exception as exc:
                 self.events.put(("error", str(exc)))
@@ -172,6 +232,11 @@ class Application:
                 self.status.set("起動しました。ブラウザで画像の投稿・学習コースを使えます。")
                 if value:
                     webbrowser.open(self.url)
+                if not self.smoke:
+                    self.diagnose()
+            elif event == "hardware":
+                devices = " / ".join(value.get("adapters", [])) or "GPU名を取得できませんでした"
+                self.hardware.set(devices + "\n" + value["label"] + "\n" + value["message"])
             elif event == "installed":
                 for button in self.buttons:
                     button.configure(state="normal")
@@ -186,6 +251,16 @@ class Application:
         if self.ready and self.process.poll() is not None:
             self.ready = False
             self.events.put(("error", "アプリが停止しました。診断ログをご確認ください。"))
+        if self.ready and not self.installing and self.command_path.exists():
+            try:
+                command = json.loads(self.command_path.read_text(encoding="utf-8"))
+                if command.get("backend") in {"auto", "cpu", "cuda", "directml"} and isinstance(
+                    command.get("voice"), bool
+                ):
+                    self.command_path.unlink()
+                    self.root.after(750, lambda: self.install(command["voice"], command["backend"]))
+            except (OSError, ValueError):
+                pass
         self.root.after(200, self.poll)
 
     def close(self):
@@ -195,6 +270,7 @@ class Application:
         self.closing = True
         self.stop()
         self.log.close()
+        self.command_path.unlink(missing_ok=True)
         self.root.destroy()
 
 

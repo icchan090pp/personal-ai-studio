@@ -54,6 +54,13 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.goto(f"http://127.0.0.1:{port}/")
             expect(page.get_by_role("heading", name="あなたの世界を、 モデルに。")).to_be_visible()
             expect(page.locator("#gpu")).to_contain_text("GPU")
+            page.locator("#gpu").click()
+            expect(page.get_by_role("heading", name="PC環境・AI機能")).to_be_visible()
+            expect(page.locator("#hardware-summary")).to_contain_text("CPU")
+            expect(page.locator("#setup-runtime")).to_be_disabled()
+            expect(page.locator("#setup-backend option")).to_have_count(4)
+            page.locator("#close-hardware").click()
+            expect(page.locator("#public-model")).to_have_value("tiny")
             page.get_by_role("button", name="＋ 新しいモデル").click()
             page.get_by_label("モデル名").fill("ブラウザテスト")
             page.get_by_label("トリガーワード", exact=True).fill("browserstyle")
@@ -164,7 +171,7 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.wait_for_function("document.querySelector('#preview audio').readyState >= 1")
             assert page.locator("#preview audio").evaluate("audio=>audio.duration>=1")
             preview_audio = page.locator("#preview audio").element_handle()
-            expect(page.locator("#public-model option")).to_have_count(5)
+            expect(page.locator("#public-model option")).to_have_count(6)
             page.locator("#public-model").select_option("ltx")
             expect(page.get_by_label("動画", exact=True)).to_be_checked()
             page.locator("#public-model").select_option("sdxl")
@@ -210,14 +217,14 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-instructions")).to_contain_text("セットアップEXE")
             assert (
                 page.locator(
-                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.2-Windows-x64.exe"]'
+                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.3-Windows-x64.exe"]'
                 ).count()
                 == 1
             )
             page.locator('[data-os="linux"]').click()
             expect(page.locator("#download-link")).to_have_attribute(
                 "href",
-                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.2/DeeL-Pyess-v0.1.2.zip",
+                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.3/DeeL-Pyess-v0.1.3.zip",
             )
             page.locator('[data-os="windows"]').click()
             page.locator(".usage-screen img").scroll_into_view_if_needed()

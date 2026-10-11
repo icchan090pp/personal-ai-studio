@@ -1,6 +1,15 @@
 """Allowlisted public-weight generation backends, separate from trained LoRA models."""
 
 PUBLIC_MODELS = {
+    "tiny": {
+        "id": "segmind/tiny-sd",
+        "name": "Tiny-SD / 軽量画像・一般のノートPC向け",
+        "kind": "image",
+        "pipeline": "StableDiffusionPipeline",
+        "license": "CreativeML OpenRAIL-M",
+        "memory": "CPU RAM 8GB以上目安 / DirectML対応GPU。256px生成後に拡大",
+        "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+    },
     "sdxl": {
         "id": "stabilityai/stable-diffusion-xl-base-1.0",
         "name": "SDXL 1.0",

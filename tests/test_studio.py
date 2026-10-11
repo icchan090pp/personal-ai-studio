@@ -66,6 +66,9 @@ def test_invalid_upload_batch_is_not_partially_saved(studio):
 
 
 def test_validation_and_gpu_readiness(studio, monkeypatch):
+    from tests.check_compat import check_hardware_and_setup
+
+    check_hardware_and_setup(studio[1], monkeypatch)
     client, _root = studio
     pid = project(client)
     assert client.post("/api/projects", json={"name": " ", "trigger": "valid"}).status_code == 422

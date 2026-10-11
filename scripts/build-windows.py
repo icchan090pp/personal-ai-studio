@@ -27,6 +27,7 @@ for filename in (
     "README.md",
     "requirements-app.txt",
     "requirements-gpu.txt",
+    "requirements-directml.txt",
     "requirements-audio.txt",
     "requirements-voice.txt",
 ):

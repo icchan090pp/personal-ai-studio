@@ -74,7 +74,10 @@ def tiny_pipeline(tmp_path):
     )
 
 
-def test_real_optimizer_export_reload_and_inference(tmp_path):
+def test_real_optimizer_export_reload_and_inference(tmp_path, monkeypatch):
+    from tests.check_compat import check_compat_generation
+
+    check_compat_generation(tmp_path, monkeypatch)
     torch.set_num_threads(1)
     pipe = tiny_pipeline(tmp_path)
     frozen_before = {key: value.detach().clone() for key, value in pipe.unet.named_parameters()}
