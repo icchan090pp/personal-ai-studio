@@ -37,7 +37,7 @@ def check_image_learning(client, root, monkeypatch):
             ).status_code
             == 422
         )
-        for key in ("tiny", "small"):
+        for key in ("tiny", "illustration", "small"):
             reply = client.post(
                 f"/api/projects/{pid}/train", json={"training_model": key, "steps": 10, "rank": 4}
             )
@@ -116,7 +116,7 @@ def check_image_learning(client, root, monkeypatch):
                     if j["kind"] == "train" and j["status"] == "completed"
                 ]
             )
-            == 2
+            == 3
         )
         for key in ("sd15", "dreamshaper"):
             reply = client.post(f"/api/projects/{pid}/train", json={"training_model": key})

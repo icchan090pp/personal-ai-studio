@@ -61,9 +61,8 @@ def optimize_video(
     optimizer = torch.optim.AdamW(parameters, lr=config["learning_rate"])
     dtype = next(transformer.parameters()).dtype
     for step in range(config["steps"]):
-        clean, reference, text = (
-            tensor.to(device=device, dtype=dtype) for tensor in random.choice(cached)
-        )
+        index = random.randrange(len(cached))
+        clean, reference, text = (tensor.to(device=device, dtype=dtype) for tensor in cached[index])
         noise = torch.randn_like(clean)
         timestep = torch.randint(
             0, scheduler.config.num_train_timesteps, (clean.shape[0],), device=device
@@ -83,6 +82,7 @@ def optimize_video(
             loss = (
                 (prediction.float() - clean.float()).square() * weight.view(-1, 1, 1, 1, 1)
             ).mean()
+            loss = loss * config.get("sample_weights", [1.0] * len(cached))[index]
         if not torch.isfinite(loss):
             raise RuntimeError("動画の学習損失が不正です")
         loss.backward()
@@ -118,6 +118,9 @@ def train_video(root, project, config, folder, progress, report):
     pipe.vae.enable_tiling()
     pipe.vae.enable_slicing()
     cached = []
+    config["sample_weights"] = [
+        0.5 if row.get("related_job_id") else 1.0 for row in config["media"]
+    ]
     pipe.vae.to("cuda")
     for row in config["media"]:
         clip = read_clip(root / "projects" / project["id"] / "media" / f"{row['id']}.mp4")

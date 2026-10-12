@@ -155,6 +155,10 @@ def execute(root, job_id):
     if job["kind"] == "video_train":
         from studio.video_learning import train_video
 
+        if config.get("related_images"):
+            from studio.related_learning import augment
+
+            augment(root, project, config, folder)
         train_video(root, project, config, folder, progress, report_metric)
         return
     if job["kind"] == "video":
@@ -325,6 +329,8 @@ def prepare_training_rows(root, project, config, captioner=None):
         if config.get("instruction", "").strip():
             row["caption"] += ", " + config["instruction"].strip()
         row["weight"] = 0.5 if row.get("pseudo_label") else 1.0
+        if row.get("related_job_id"):
+            row["weight"] *= 0.5
         if mode == "reinforcement":
             row["weight"] *= reward_weight(row.get("rating"))
     # Keep the captions and confidence used for this training run in its immutable snapshot.

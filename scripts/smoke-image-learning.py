@@ -62,7 +62,13 @@ def main():
             print(json.dumps(records[-1]), flush=True)
             return job_id
 
-        first = run("train", {"training_model": "tiny", "steps": 10, "rank": 4})
+        first = run(
+            "train", {"training_model": "tiny", "steps": 10, "rank": 4, "related_images": True}
+        )
+        related = json.loads(
+            (root / "jobs" / first / "related-report.json").read_text(encoding="utf-8")
+        )
+        assert related["stage"] in {"ready", "no_matches"}, related
         state = load_file(root / "jobs" / first / "adapter/pytorch_lora_weights.safetensors")
         assert all(torch.isfinite(t).all() for t in state.values())
         assert any(t.abs().sum() > 0 for k, t in state.items() if "lora.up" in k or "lora_B" in k)
@@ -102,6 +108,7 @@ def main():
                 "jobs": records,
                 "adapter_changed": True,
                 "restart_preserved": True,
+                "related_discovery": related,
             },
             indent=2,
         ),

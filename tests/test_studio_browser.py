@@ -63,15 +63,15 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.locator("#close-hardware").click()
             page.locator("#update-button").click()
             expect(page.locator("#update-dialog")).to_be_visible()
-            expect(page.locator("#update-version")).to_contain_text("0.1.6")
+            expect(page.locator("#update-version")).to_contain_text("0.1.7")
             page.route(
                 "**/api/system/update",
                 lambda route: route.fulfill(
-                    json={"current": "0.1.6", "latest": "0.1.7", "available": True}
+                    json={"current": "0.1.7", "latest": "0.1.8", "available": True}
                 ),
             )
             page.locator("#check-update").click()
-            expect(page.locator("#update-status")).to_contain_text("0.1.7")
+            expect(page.locator("#update-status")).to_contain_text("0.1.8")
             expect(page.locator("#install-update")).to_be_disabled()
             page.screenshot(path=str(screenshots / f"update-{viewport['width']}.png"))
             page.locator("#close-update").click()
@@ -127,6 +127,17 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#video-training-help")).to_contain_text("CPU")
             expect(page.locator("#steps")).to_have_value("10")
             expect(page.locator("#media-upload-controls")).to_have_attribute("open", "")
+            page.locator("#learning-preset").select_option("vtuber")
+            expect(page.locator("#training-instruction")).to_have_value(
+                "anime avatar, clean line art, cel shading, expressive face, character design, simple background"
+            )
+            expect(page.locator("#video-training-base")).to_have_value("animatediff")
+            expect(page.locator("#steps")).to_have_value("10")
+            expect(page.locator("#related-label")).to_have_text(
+                "関連動画を自動で探し、一緒に学習する"
+            )
+            page.locator("#related-images").check()
+            page.locator("#related-images").uncheck()
             page.locator('[data-workspace="agent"]').click()
             expect(page.locator('[data-workspace="agent"]')).to_have_class(
                 "learning-section active"
@@ -136,8 +147,53 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
                 "learning-section active"
             )
             page.locator('[data-workspace="image"]').click()
-            expect(page.locator("#training-base option")).to_have_count(4)
+            expect(page.locator("#training-base option")).to_have_count(5)
             expect(page.locator("#training-base")).to_have_value("tiny")
+            page.locator("#learning-preset").select_option("anime")
+            expect(page.locator("#training-base")).to_have_value("illustration")
+            expect(page.locator("#training-instruction")).to_have_value(
+                "anime illustration, clean line art, cel shading, expressive eyes"
+            )
+            expect(page.locator("#training-mode")).to_have_value("style")
+            page.locator("#related-images").check()
+            page.reload()
+            expect(page.locator("#related-images")).to_be_checked()
+            expect(page.locator("#training-base")).to_have_value("illustration")
+            page.locator("#related-images").uncheck()
+            page.locator("#assistant-panel summary").click()
+            page.locator("#assistant-mode").select_option("think")
+            expect(page.locator("#assistant-mode-help")).to_contain_text("改善案")
+            page.locator("#assistant-mode").select_option("research")
+            expect(page.locator("#research-query")).to_have_value("anime illustration")
+            page.route(
+                "**/api/projects/*/assistant",
+                lambda route: route.fulfill(
+                    json={
+                        "answer": "まず10ステップで比較しましょう。[1]",
+                        "warnings": [],
+                        "sources": [
+                            {
+                                "title": "LoRAの資料",
+                                "url": "https://huggingface.co/docs/diffusers/",
+                                "kind": "guide",
+                            }
+                        ],
+                    }
+                ),
+            )
+            page.locator("#assistant-prompt").fill("アニメ風の育て方")
+            with page.expect_request("**/api/projects/*/assistant") as request:
+                page.locator("#ask-assistant").click()
+            assert request.value.post_data_json["mode"] == "research"
+            expect(page.locator("#assistant-answer")).to_contain_text("10ステップ")
+            expect(page.locator("#assistant-sources a")).to_have_attribute(
+                "href", "https://huggingface.co/docs/diffusers/"
+            )
+            page.locator("#use-advice").click()
+            expect(page.locator("#training-instruction")).to_have_value(
+                "まず10ステップで比較しましょう。[1]"
+            )
+            page.unroute("**/api/projects/*/assistant")
             page.locator("#training-base").select_option("small")
             expect(page.locator("#training-base-help")).to_contain_text("CPU学習対応")
             page.wait_for_function("projects.find(p=>p.id===current)?.training_model==='small'")
@@ -323,14 +379,14 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-instructions")).to_contain_text("セットアップEXE")
             assert (
                 page.locator(
-                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe"]'
+                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.7-Windows-x64.exe"]'
                 ).count()
                 == 1
             )
             page.locator('[data-os="linux"]').click()
             expect(page.locator("#download-link")).to_have_attribute(
                 "href",
-                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.6/DeeL-Pyess-v0.1.6.zip",
+                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.7/DeeL-Pyess-v0.1.7.zip",
             )
             page.locator('[data-os="windows"]').click()
             page.locator(".usage-screen img").scroll_into_view_if_needed()

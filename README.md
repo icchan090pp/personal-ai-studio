@@ -4,6 +4,16 @@
 初期検証版です。**100件の製品試験を5回連続で実行**し、全件合格しました。検証スクリプトとJUnit記録を同梱します。
 CUDA実機・大型基盤モデルによるGPU学習／生成品質・個人のWindows実機でのGPU機能は未検証です。Windowsセットアップと基本起動はWindows CIで確認しました。
 
+## v0.1.7：学習済みの画風から、関連画像も使って育てる
+
+「おすすめ設定 → アニメ風」で、学習済みのDreamShaper 8とCPU用の設定・学習指示を選べます。VTuber風・水彩イラスト・写真風の設定も用意しました。VTuber風はアバター表現の設定です。30億枚の学習や全作品・全VTuberの網羅を実施・保証するものではありません。DreamShaper 8のCPU学習はRAM 16GB以上が目安です。画風をゼロから学び直す必要はなく、3枚以上のお手本で自分好みに追加学習できます。最適な設定や品質を保証するものではなく、学習前後の比較を使って調整してください。
+
+「関連画像／関連動画を自動で探し、一緒に学習する」を有効にすると、投稿した画像・動画の内容・画風をBLIPとCLIPでPC内解析し、Wikimedia Commonsで関連画像を検索します。解析モデルは初回に約1.6GBを取得。画像そのものは送信せず、画像から得た検索語を送信します。1回最大3件（設定で1〜5件）を追加し、選択したモデルの実際のLoRA学習に使います。既存の完成モデルを出発点にした継続学習にも対応します。動画では複数フレームの見た目を比較し、実際の短いクリップを映像LoRA学習に使います。動きの一致は保証しません。収集動画の音声は学習に使わず、動画生成時の音声はKokoroなど別モデルで合成します。
+
+類似度の基準・重複・出典を確認し、追加した画像は画面に表示します。元の投稿画像を検索の手がかりにし続け、追加画像は元画像以下の枚数・半分の学習重みで使います。「次の学習から除外」で不要な候補を外せます。検索が失敗した場合や候補がない場合はその旨を表示し、元の画像で学習します。無限に収集・学習を繰り返す機能ではありません。完成済みの版は保持します。
+
+Think・Researchは、画像・動画共通の学習チャットから選びます。Thinkは現在のデータ件数・基盤・前回設定・PCメモリをもとに、ローカルgpt-ossが改善案を考えます。Researchは公式の学習ガイドとWikimedia Commonsの素材情報を取得し、出典付きの学習案を提案します。Ollamaとgpt-ossを別途導入してください。資料の取得に失敗した場合は画面に表示します。提案を確認して学習指示の下書きへ入れ、編集・保存してから学習を実行します。相談だけで重みは更新しません。
+
 ## 機能
 
 - Tiny-SD・Small-SDのCPU画像LoRA、SD 1.5・DreamShaper 8のCUDA画像LoRA、CogVideoX-5b-I2V動画LoRAと生成。実験用の短い効果音・環境音モデルの学習／動画への付加
@@ -19,7 +29,7 @@ CUDA実機・大型基盤モデルによるGPU学習／生成品質・個人のW
 
 ## Windowsへのインストール・更新
 
-[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe` を取得して実行してください。
+[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.7-Windows-x64.exe` を取得して実行してください。
 Windows 10/11・64bit用、Python同梱です。既存のDeeL Pyessを終了し、同じ保存先へ上書き更新できます。
 デスクトップの「DeeL Pyess」で起動し、「このPCのAI機能をセットアップ」を実行します。
 投稿データ・完成モデルは `%LOCALAPPDATA%\DeeL Pyess\data`、診断ログは同フォルダのstartup.logです。
@@ -40,7 +50,7 @@ GPUの演算非対応・メモリ不足時はCPUで再試行し、使用した�
 失敗したGPU処理は記録し、次回からCPUを優先します。「再診断する」でGPUの再試行を許可できます。
 明示的にCPUを選択してセットアップした場合は、軽量画像をCPUで生成する設定を保持します。
 初回セットアップは数GBのダウンロード、Tiny-SDの重みは約1.3GBです。RAM 8GB以上を目安としてください。
-Tiny-SD・Small-SDの画像LoRA学習と学習後の生成はCPUを使います。学習画面で基盤モデルを選び、3枚以上の画像を投稿してください。まず30ステップ・ランク4で試し、完成モデルの版を選んで継続学習できます。各版は保持されます。Tiny-SDはRAM 8GB、Small-SDは12GB以上が目安です。AnimateDiffの短い動画はCPU・RAM 16GB以上が目安です。SD 1.5・DreamShaper 8の画像学習とCogVideoXは十分なVRAMを持つCUDA GPUが必要です。
+Tiny-SD・Small-SDの画像LoRA学習と学習後の生成はCPUを使います。学習画面で基盤モデルを選び、3枚以上の画像を投稿してください。まず30ステップ・ランク4で試し、完成モデルの版を選んで継続学習できます。各版は保持されます。Tiny-SDはRAM 8GB、Small-SDは12GB以上が目安です。AnimateDiffの短い動画はCPU・RAM 16GB以上が目安です。SD 1.5・DreamShaper 8のCUDA設定とCogVideoXは十分なVRAMを持つCUDA GPUが必要です。アニメ・イラスト用DreamShaper 8のCPU設定はRAM 16GB以上が目安です。
 日本語音声と声質特徴抽出はCPUでも利用できます。CPUでは処理に時間がかかります。
 
 ### Linux・開発者向けソース版
@@ -52,7 +62,7 @@ AI機能は仮想環境で `python -m studio.setup_runtime --backend cpu`、NVID
 
 ## モデルと環境
 
-画像の学習基盤：Tiny-SD・Small-SD（CPU）、SD 1.5・DreamShaper 8（CUDA）。
+画像の学習基盤：Tiny-SD・Small-SD・DreamShaper 8アニメ／イラスト（CPU）、SD 1.5・DreamShaper 8（CUDA）。
 動画の学習基盤：AnimateDiff v1.5-2 + DreamShaper 8（CPU）、`THUDM/CogVideoX-5b-I2V`（CUDA）。モデル重みはZIPに含まず、初回に配布元から取得します。
 それぞれのモデルライセンス・アクセス条件が適用されます。
 CPUの目安：Tiny-SD RAM8GB、Small-SD RAM12GB、AnimateDiff RAM16GB以上。CUDA画像学習はVRAM16GB、CogVideoXの生成は16〜24GB、学習は48〜80GB VRAM・ホストRAM32GB以上が目安です。実際の必要量は機器・モデル・設定・他のアプリの使用量で変わります。

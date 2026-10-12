@@ -23,6 +23,17 @@ IMAGE_TRAINING_MODELS = {
         "safetensors": False,
         "description": "Tiny-SDより大きい画像モデル。CPU学習対応、RAM 12GB以上が目安。処理時間も増えます。",
     },
+    "illustration": {
+        "id": "Lykon/dreamshaper-8",
+        "name": "DreamShaper 8 / アニメ・イラスト / CPU学習",
+        "revision": "a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917",
+        "backend": "cpu",
+        "ram_gb": 16,
+        "resolution": 256,
+        "steps": 30,
+        "safetensors": True,
+        "description": "アニメ・イラスト・写実の表現を学習済みの公開モデルから育成。CPU・RAM 16GB以上が目安。Tiny-SDより取得容量・処理時間が増えます。",
+    },
     "sd15": {
         "id": "stable-diffusion-v1-5/stable-diffusion-v1-5",
         "name": "Stable Diffusion 1.5 / CUDA学習",

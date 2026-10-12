@@ -20,7 +20,16 @@ from tests.test_studio_matrix import gpu_readiness_only, ready_dataset
 def test_two_model_catalog(studio, monkeypatch):
     client, _root = studio
     models = client.get("/api/models").json()
-    assert len(models) == 6
+    assert len(models) == 7
+    from tests.check_related_learning import check_related_learning, check_related_video
+
+    with monkeypatch.context() as patch:
+        check_related_learning(client, _root, patch)
+        check_related_video(client, _root, patch)
+    from tests.check_research import check_research
+
+    with monkeypatch.context() as patch:
+        check_research(client, _root, patch)
     from tests.check_image_learning import check_image_learning
 
     check_image_learning(client, _root, monkeypatch)
@@ -124,6 +133,7 @@ def test_two_model_catalog(studio, monkeypatch):
         )
         assert response.json()["answer"] == "watercolor texture"
         assert calls[-1]["think"] == "high" and calls[-1]["model"] == model
+        assert calls[-1]["options"]["num_predict"] == 4096
     assert (
         client.post(
             f"/api/projects/{pid}/assistant", json={"prompt": "help", "model": "unknown"}

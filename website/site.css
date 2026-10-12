@@ -10,3 +10,5 @@
 .level-grid{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:600px){.level-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .voice-screen{margin:35px 0;color:#d9e8ff}.voice-screen img{display:block;width:100%;height:auto;border:1px solid #294768;border-radius:12px}.voice-screen>p{max-width:900px;color:#9bb1cd}
+
+.related-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:24px 0}.related-steps article{background:#0c1625;border:1px solid #26405f;border-radius:14px;padding:24px}.related-steps article>span{color:#6baaff}.related-steps h3{font-size:16px}.related-steps p,#related-learning>.hint{color:#98acc8;font-size:12px;line-height:1.9}@media(max-width:700px){.related-steps{grid-template-columns:1fr}}

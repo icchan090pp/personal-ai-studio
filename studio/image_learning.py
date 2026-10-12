@@ -74,6 +74,10 @@ def execute(root, job_id):
     # Captioning is released before loading the diffusion weights on smaller PCs.
     if job["kind"] == "train":
         config["job_id"] = job_id
+        if config.get("related_images"):
+            from studio.related_learning import augment
+
+            augment(root, project, config, folder)
         prepare_training_rows(root, project, config)
     pipe = load_pipeline(config)
     adapter_id = config.get("start_job_id") if job["kind"] == "train" else config["trained_job_id"]

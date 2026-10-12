@@ -64,7 +64,8 @@ def optimize_motion(unet, scheduler, cached, config, progress, report):
     parameters = [parameter for parameter in unet.parameters() if parameter.requires_grad]
     optimizer = torch.optim.AdamW(parameters, lr=config["learning_rate"])
     for step in range(config["steps"]):
-        latent, text = random.choice(cached)
+        index = random.randrange(len(cached))
+        latent, text = cached[index]
         noise = torch.randn_like(latent)
         timestep = torch.randint(0, scheduler.config.num_train_timesteps, (1,))
         noisy = scheduler.add_noise(latent, noise, timestep)
@@ -78,6 +79,7 @@ def optimize_motion(unet, scheduler, cached, config, progress, report):
             else noise
         )
         loss = (prediction.float() - target.float()).square().mean()
+        loss = loss * config.get("sample_weights", [1.0] * len(cached))[index]
         if not torch.isfinite(loss):
             raise RuntimeError("non-finite video training loss")
         loss.backward()
@@ -107,6 +109,9 @@ def train_motion(pipe, root, project, config, folder, progress, report):
     pipe.vae.requires_grad_(False)
     pipe.text_encoder.requires_grad_(False)
     cached = []
+    config["sample_weights"] = [
+        0.5 if row.get("related_job_id") else 1.0 for row in config["media"]
+    ]
     for row in config["media"]:
         # Four consecutive sampled moments keep back-propagation small; order is retained.
         clip = read_clip(
@@ -223,6 +228,12 @@ def execute(root, job_id):
                 ),
             )
 
+    if job["kind"] == "video_train" and config.get("related_images"):
+        from studio.related_learning import augment
+
+        config["job_id"] = job_id
+        augment(root, project, config, folder)
+        gc.collect()
     pipe = load_pipeline(config)
     adapter_id = (
         config.get("start_job_id") if job["kind"] == "video_train" else config.get("trained_job_id")

@@ -29,7 +29,12 @@ def ask(model, prompt, level, *, memory="", examples=()):
             else "medium"
             if level == "power"
             else "low",
-            "options": {"num_predict": 1024, "num_ctx": 8192, "num_batch": 64, "use_mmap": True},
+            "options": {
+                "num_predict": 4096 if level in {"excellent", "ultra"} else 1024,
+                "num_ctx": 8192,
+                "num_batch": 64,
+                "use_mmap": True,
+            },
             "keep_alive": "0s",
         }
     )

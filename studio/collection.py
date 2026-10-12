@@ -16,6 +16,13 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from PIL import Image, ImageOps
 
 LIMIT = 20 * 1024 * 1024
+ACCESS_LIMIT_MESSAGE = (
+    "公開サイトが取得を制限しています。収集を停止しました。時間をおいて再実行してください。"
+)
+
+
+class CollectionAccessLimit(ValueError):
+    pass
 
 
 def public_address(url):
@@ -84,6 +91,8 @@ def fetch_public(url, max_bytes=LIMIT):
                 url = urljoin(url, response.getheader("Location", ""))
                 continue
             if response.status != 200:
+                if response.status in {403, 429}:
+                    raise CollectionAccessLimit(ACCESS_LIMIT_MESSAGE)
                 raise ValueError(f"サイトがHTTP {response.status}を返しました")
             length = response.getheader("Content-Length")
             if length and int(length) > max_bytes:
@@ -151,15 +160,36 @@ def discover(options, fetcher=fetch_public):
             "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url%7Cextmetadata&gsrsearch="
             + quote(search)
         )
+        if options.get("thumbnail_width"):
+            url += "&iiurlwidth=" + str(options["thumbnail_width"])
+        if options.get("media") == "video":
+            url = url.replace(
+                "prop=imageinfo&iiprop=url%7Cextmetadata",
+                "prop=videoinfo&viprop=url%7Cderivatives%7Cextmetadata",
+            )
         data, _, _ = fetcher(url, 2 * 1024 * 1024)
         pages = json.loads(data).get("query", {}).get("pages", {})
         results = []
         for item in pages.values():
-            info = item.get("imageinfo", [{}])[0]
+            info = item.get("videoinfo", item.get("imageinfo", [{}]))[0]
             if info.get("url"):
+                media_url = info.get("thumburl", info["url"])
+                if options.get("media") == "video":
+                    variants = [
+                        v
+                        for v in info.get("derivatives", [])
+                        if v.get("src")
+                        and v.get("type", "").startswith("video/webm")
+                        and 240 <= v.get("height", 0) <= 720
+                        and v.get("width", 0) <= 1280
+                    ]
+                    if variants:
+                        media_url = min(
+                            variants, key=lambda v: (abs(v["height"] - 360), v.get("bandwidth", 0))
+                        )["src"]
                 results.append(
                     {
-                        "url": info["url"],
+                        "url": media_url,
                         "page": info.get("descriptionurl", url),
                         "caption": item.get("title", ""),
                         "license": info.get("extmetadata", {})
@@ -281,6 +311,9 @@ def collect(options, fetcher=fetch_public):
                 )
                 if len(rows) >= options.get("max_files", 10):
                     break
+        except CollectionAccessLimit:
+            errors.append(ACCESS_LIMIT_MESSAGE)
+            break
         except Exception:
             errors.append("取得できない、または対応外のメディアを1件除外しました")
     return rows, errors

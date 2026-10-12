@@ -96,7 +96,7 @@ def check_hardware_and_setup(root, monkeypatch):
         desktop.events = queue.Queue()
         desktop.spawn = lambda args: SimpleNamespace(poll=lambda: None)
         catalog = client.get("/api/models").content
-        assert len(json.loads(catalog)) == 6
+        assert len(json.loads(catalog)) == 7
         with monkeypatch.context() as startup_patch:
             startup_patch.setattr(
                 "windows.desktop.urllib.request.urlopen", lambda *a, **k: io.BytesIO(catalog)
@@ -118,7 +118,7 @@ def check_hardware_and_setup(root, monkeypatch):
         patch.setattr(
             module,
             "check_update",
-            lambda: {"current": "0.1.6", "latest": "0.1.7", "available": True},
+            lambda: {"current": "0.1.7", "latest": "0.1.8", "available": True},
         )
         assert client.get("/api/system/update").json()["available"]
         assert client.post("/api/system/update", json={}).status_code == 202
