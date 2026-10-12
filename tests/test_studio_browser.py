@@ -127,6 +127,14 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#video-training-help")).to_contain_text("CPU")
             expect(page.locator("#steps")).to_have_value("10")
             expect(page.locator("#media-upload-controls")).to_have_attribute("open", "")
+            page.locator('[data-workspace="agent"]').click()
+            expect(page.locator('[data-workspace="agent"]')).to_have_class(
+                "learning-section active"
+            )
+            page.get_by_role("button", name="モデルを育てる").click()
+            expect(page.locator('[data-workspace="video"]')).to_have_class(
+                "learning-section active"
+            )
             page.locator('[data-workspace="image"]').click()
             expect(page.locator("#training-base option")).to_have_count(4)
             expect(page.locator("#training-base")).to_have_value("tiny")

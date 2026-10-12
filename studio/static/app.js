@@ -12,7 +12,7 @@ async function api(path, options={}) {
 }
 function json(body){return {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};}
 function node(tag, text, className){const n=document.createElement(tag); if(text)n.textContent=text; if(className)n.className=className; return n;}
-function tab(name){if(name==='agent')loadAgent().catch(e=>notice(e.message,true));if(name==='course')loadCourse().catch(e=>notice(e.message,true));document.querySelectorAll('.tab').forEach(n=>n.hidden=n.id!==name);document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.tab===name));$('breadcrumb').textContent={train:'モデルを育てる',generate:'作品をつくる',gallery:'ギャラリー',course:'AI開発コース',agent:'エージェントを育てる'}[name];}
+function tab(name){if(['train','agent'].includes(name))document.querySelectorAll('[data-workspace]').forEach(n=>n.classList.toggle('active',n.dataset.workspace===(name==='agent'?'agent':$('training-target').value)));if(name==='agent')loadAgent().catch(e=>notice(e.message,true));if(name==='course')loadCourse().catch(e=>notice(e.message,true));document.querySelectorAll('.tab').forEach(n=>n.hidden=n.id!==name);document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.tab===name));$('breadcrumb').textContent={train:'モデルを育てる',generate:'作品をつくる',gallery:'ギャラリー',course:'AI開発コース',agent:'エージェントを育てる'}[name];}
 document.querySelectorAll('.nav').forEach(n=>n.addEventListener('click',()=>tab(n.dataset.tab)));
 $('new-project').onclick=()=>{$('project-dialog').showModal();$('model-name').focus();};
 $('close-dialog').onclick=()=>$('project-dialog').close();
