@@ -43,6 +43,13 @@ def execute(root, job_id):
         ).fetchone()
     config = json.loads(job["config"])
     config["job_id"] = job_id
+    if job["kind"] == "image" and config.get("trained_job_id"):
+        with sqlite3.connect(root / "studio.sqlite3") as db:
+            db.row_factory = sqlite3.Row
+            trained = db.execute(
+                "SELECT id,config FROM jobs WHERE id=? AND project_id=? AND kind='train' AND status='completed'",
+                (config["trained_job_id"], project["id"]),
+            ).fetchone()
     folder = root / "jobs" / job_id
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -153,10 +160,25 @@ def execute(root, job_id):
             "THUDM/CogVideoX-5b-I2V", torch_dtype=torch.bfloat16
         )
         with sqlite3.connect(root / "studio.sqlite3") as db:
-            video_adapter = db.execute(
-                "SELECT id FROM jobs WHERE project_id=? AND kind='video_train' AND status='completed' ORDER BY rowid DESC LIMIT 1",
-                (project["id"],),
-            ).fetchone()
+            if config.get("trained_job_id"):
+                video_adapter = db.execute(
+                    "SELECT id FROM jobs WHERE id=? AND project_id=? AND kind='video_train' AND status='completed'",
+                    (config["trained_job_id"], project["id"]),
+                ).fetchone()
+            else:
+                # Legacy requests must never attach an incompatible AnimateDiff adapter.
+                candidates = db.execute(
+                    "SELECT id,config FROM jobs WHERE project_id=? AND kind='video_train' AND status='completed' ORDER BY rowid DESC",
+                    (project["id"],),
+                ).fetchall()
+                video_adapter = next(
+                    (
+                        row
+                        for row in candidates
+                        if json.loads(row[1]).get("video_model", "cogvideo") == "cogvideo"
+                    ),
+                    None,
+                )
         if video_adapter:
             pipe.load_lora_weights(str(root / "jobs" / video_adapter[0] / "adapter"))
         pipe.enable_model_cpu_offload()
@@ -427,7 +449,12 @@ def train_adapter(
         "name": project["name"],
         "trigger": project["trigger"],
         "base_model": config["base_model"],
-        "architecture": "SD 1.5",
+        "architecture": "SD 1.x derived UNet; use the exact base_model",
+        "base_revision": config.get("base_revision"),
+        "training_model": config.get("training_model"),
+        "training_resolution": resolution,
+        "backend": device,
+        "start_job_id": config.get("start_job_id"),
         "training_mode": config.get("mode", "supervised"),
         "level": config.get("level", "normal"),
         "group": config.get("group"),

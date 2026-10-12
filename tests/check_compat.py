@@ -94,7 +94,7 @@ def check_hardware_and_setup(root, monkeypatch):
         patch.setattr(
             module,
             "check_update",
-            lambda: {"current": "0.1.5", "latest": "0.1.6", "available": True},
+            lambda: {"current": "0.1.6", "latest": "0.1.7", "available": True},
         )
         assert client.get("/api/system/update").json()["available"]
         assert client.post("/api/system/update", json={}).status_code == 202

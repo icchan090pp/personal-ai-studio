@@ -63,15 +63,15 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.locator("#close-hardware").click()
             page.locator("#update-button").click()
             expect(page.locator("#update-dialog")).to_be_visible()
-            expect(page.locator("#update-version")).to_contain_text("0.1.5")
+            expect(page.locator("#update-version")).to_contain_text("0.1.6")
             page.route(
                 "**/api/system/update",
                 lambda route: route.fulfill(
-                    json={"current": "0.1.5", "latest": "0.1.6", "available": True}
+                    json={"current": "0.1.6", "latest": "0.1.7", "available": True}
                 ),
             )
             page.locator("#check-update").click()
-            expect(page.locator("#update-status")).to_contain_text("0.1.6")
+            expect(page.locator("#update-status")).to_contain_text("0.1.7")
             expect(page.locator("#install-update")).to_be_disabled()
             page.screenshot(path=str(screenshots / f"update-{viewport['width']}.png"))
             page.locator("#close-update").click()
@@ -103,15 +103,54 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.get_by_label("画像の説明", exact=True)).to_have_value(
                 "a drawing of browserstyle"
             )
+            page.locator('[data-workspace="agent"]').click()
+            expect(page.locator("#agent")).to_be_visible()
+            page.locator("#agent-name").fill("私の作品アシスタント")
+            page.locator("#agent-instruction").fill("短く具体的に提案してください")
+            page.locator("#agent-knowledge").fill("作品名は青い庭です")
+            page.locator("#agent-add-example").click()
+            page.get_by_label("お手本の依頼", exact=True).fill("作品名は？")
+            page.get_by_label("お手本の回答", exact=True).fill("青い庭です。")
+            page.locator("#agent-save").click()
+            expect(page.locator("#agent-version option")).to_have_count(1)
+            expect(page.locator("#agent-version")).to_contain_text("私の作品アシスタント")
+            saved_agent = page.locator("#agent-version").input_value()
+            page.reload()
+            page.locator('[data-workspace="agent"]').click()
+            page.locator("#agent-start").select_option(saved_agent)
+            expect(page.locator("#agent-knowledge")).to_have_value("作品名は青い庭です")
+            expect(page.get_by_label("お手本の回答", exact=True)).to_have_value("青い庭です。")
+            page.locator('[data-workspace="video"]').click()
+            expect(page.locator("#video-training-controls")).to_be_visible()
+            expect(page.locator("#video-training-base option")).to_have_count(2)
+            expect(page.locator("#video-training-base")).to_have_value("animatediff")
+            expect(page.locator("#video-training-help")).to_contain_text("CPU")
+            expect(page.locator("#steps")).to_have_value("10")
+            expect(page.locator("#media-upload-controls")).to_have_attribute("open", "")
+            page.locator('[data-workspace="image"]').click()
+            expect(page.locator("#training-base option")).to_have_count(4)
+            expect(page.locator("#training-base")).to_have_value("tiny")
+            page.locator("#training-base").select_option("small")
+            expect(page.locator("#training-base-help")).to_contain_text("CPU学習対応")
+            page.wait_for_function("projects.find(p=>p.id===current)?.training_model==='small'")
+            page.reload()
+            expect(page.locator("#training-base")).to_have_value("small")
+            page.locator("#training-base").select_option("dreamshaper")
+            expect(page.locator("#train-button")).to_be_disabled()
+            expect(page.locator("#training-base-help")).to_contain_text(
+                "必要条件を満たしていません"
+            )
+            page.locator("#training-base").select_option("tiny")
+            expect(page.locator("#train-button")).to_be_enabled()
             page.locator("#training-mode").select_option("style")
             expect(page.locator("#mode-help")).to_contain_text("画風")
-            expect(page.locator("#steps")).to_have_value("800")
+            expect(page.locator("#steps")).to_have_value("30")
             expect(page.locator("#training-group")).to_contain_text("default")
             expect(page.locator("#folder-upload")).to_have_attribute("webkitdirectory", "")
             page.locator("#model-level").select_option("excellent")
-            expect(page.locator("#steps")).to_have_value("2000")
+            expect(page.locator("#steps")).to_have_value("100")
             page.locator("#model-level").select_option("ultra")
-            expect(page.locator("#steps")).to_have_value("5000")
+            expect(page.locator("#steps")).to_have_value("200")
             expect(page.locator("#assistant-model option")).to_have_count(2)
             page.locator("#training-instruction").fill("watercolor texture")
             page.locator("#send-training-chat").click()
@@ -219,6 +258,9 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.locator("#output-resolution").select_option("4k")
             expect(page.locator("#output-resolution")).to_have_value("4k")
             page.get_by_label("動画", exact=True).check()
+            expect(page.locator("#generation-video-model")).to_have_value("animatediff")
+            expect(page.locator("#source-label")).to_be_hidden()
+            page.locator("#generation-video-model").select_option("cogvideo")
             expect(page.locator("#source-label")).to_be_visible()
             page.get_by_role("button", name="ギャラリー").click()
             expect(page.locator("#gallery-items audio")).to_have_count(1)
@@ -238,6 +280,18 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.screenshot(
                 path=str(screenshots / f"studio-{viewport['width']}.png"), full_page=True
             )
+            page.locator("#upload").set_input_files(str(image))
+            expect(page.locator("#image-count")).to_have_text("3 / 100枚")
+            page.locator("#steps").fill("10")
+            with page.expect_response(f"**/api/projects/{pid}/train") as trained:
+                page.locator("#train-button").click()
+            assert trained.value.status == 202
+            config = json.loads(trained.value.json()["config"])
+            assert config["training_model"] == "tiny" and config["steps"] == 10
+            expect(page.locator("#train-button")).to_be_disabled()
+            page.locator("#reset-training").click()
+            expect(page.get_by_role("status")).to_contain_text("学習をリセットしました（1件）")
+            expect(page.locator("#image-count")).to_have_text("3 / 100枚")
             page.get_by_role("button", name="Tiny-SDで画像をつくる").click()
             page.locator("#prompt").fill("a blue watercolor bird")
             with page.expect_response(f"**/api/projects/{pid}/generate") as generated:
@@ -261,14 +315,14 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#os-instructions")).to_contain_text("セットアップEXE")
             assert (
                 page.locator(
-                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe"]'
+                    '#download-link[href$="DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe"]'
                 ).count()
                 == 1
             )
             page.locator('[data-os="linux"]').click()
             expect(page.locator("#download-link")).to_have_attribute(
                 "href",
-                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.5/DeeL-Pyess-v0.1.5.zip",
+                "https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.6/DeeL-Pyess-v0.1.6.zip",
             )
             page.locator('[data-os="windows"]').click()
             page.locator(".usage-screen img").scroll_into_view_if_needed()

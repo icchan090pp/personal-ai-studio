@@ -1,5 +1,5 @@
 {
-  "version": "v0.1.5",
+  "version": "v0.1.6",
   "unique_cases": 100,
   "consecutive_runs": 5,
   "total_executions": 500,
@@ -10,9 +10,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 40.742,
-      "timestamp": "2026-10-11T23:07:05.082475+00:00",
-      "report_sha256": "91ac584a95d53e1679fa51320bd21f02da71ea7b2de256c22bdb1d3199958b94"
+      "seconds": 63.502,
+      "timestamp": "2026-10-12T00:48:19.695390+00:00",
+      "report_sha256": "0c3f43efa124378e7f5fd1e514a2add48e684b3eb292da639acc77dd0719a26b"
     },
     {
       "run": 2,
@@ -20,9 +20,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 46.47,
-      "timestamp": "2026-10-11T23:07:52.104706+00:00",
-      "report_sha256": "1bdc3ebcbc39a7004b28015fd6970ff9f62a309625096c76d157c18f633f0438"
+      "seconds": 60.533,
+      "timestamp": "2026-10-12T00:49:29.057678+00:00",
+      "report_sha256": "fde71b7f4016ce775774b8f1b083082dab8def354668ceded5a51da19f2a293a"
     },
     {
       "run": 3,
@@ -30,9 +30,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 40.337,
-      "timestamp": "2026-10-11T23:08:42.878640+00:00",
-      "report_sha256": "263d2529d5c7a853f7dc7682db6667868c1949158194b33c53483a3c4981e86f"
+      "seconds": 62.641,
+      "timestamp": "2026-10-12T00:50:35.109172+00:00",
+      "report_sha256": "ebb11d5d34bea823e1f1b29eea0d3e36e0381316be0bec0703017cdc75eaf2f7"
     },
     {
       "run": 4,
@@ -40,9 +40,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 39.118,
-      "timestamp": "2026-10-11T23:09:28.040772+00:00",
-      "report_sha256": "234ff571417b4c34d22c322b084ec3cce358d4adb00f5fbdb1f258cf59cbf63a"
+      "seconds": 63.448,
+      "timestamp": "2026-10-12T00:51:43.427329+00:00",
+      "report_sha256": "1b3284fa0d8fe751cc136c44c5bfb2d23302440f21ea6b26f3421865d4e9f3f8"
     },
     {
       "run": 5,
@@ -50,24 +50,16 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 39.454,
-      "timestamp": "2026-10-11T23:10:11.766498+00:00",
-      "report_sha256": "c5d81cf87ef298c79bb7d493e71ba4788cb1fb54c9b22e7eeda4959b3a69eac2"
+      "seconds": 63.638,
+      "timestamp": "2026-10-12T00:52:54.512042+00:00",
+      "report_sha256": "e549fa1423d482b6f11260d780301bace0a556c7daeb01e0cf25c494e799caf0"
     }
   ],
   "additional_manual_checks": [
-    "actual fixed Tiny-SD pretrained model CPU image generation",
-    "actual app HTTP API -> subprocess worker -> Tiny-SD 20 steps -> 1280x720 PNG download",
-    "desktop/mobile hardware dialog and setup controls in real Chromium",
-    "Windows EXE upgrade from v0.1.2 with unchanged user database hash",
-    "actual Windows CPU packages and isolated DirectML installation with separate Torch versions",
-    "native Windows setup button -> HTTP command -> package installation -> app restart",
-    "five native Windows launches/uploads/exits with no external Python in PATH",
-    "Windows uninstall retains user data",
-    "fresh native Windows installation and real WebView2 DOM navigation",
-    "official GitHub update metadata and full v0.1.3 EXE download with SHA256 verification",
-    "actual Chromium in-app update check against official GitHub releases",
-    "memory guidance at 4GB, 8GB, 16GB and unknown capacity; persistent CPU choice and GPU failure fallback",
-    "fresh project -> Tiny-SD quick selection -> real CPU generation -> 720p PNG displayed in Chromium"
+    "Actual Tiny-SD and Small-SD published weights: CPU training, continuation, adapter changes, loading learned adapter, PNG generation",
+    "Actual Chromium: existing version -> generation-test training -> select trained version -> CPU generation -> PNG preview; desktop/mobile layout",
+    "CPU learning peak worker RSS: Tiny-SD 2.824 GiB, Small-SD 3.499 GiB on development host; not user-PC benchmark",
+    "Windows release gate: real installed-runtime Tiny-SD CPU training, continuation, PNG and ZIP download, restart persistence",
+    "Windows release gate: v0.1.5 installer upgrade, WebView2 training selections, CPU/DirectML isolated setup, five starts/uploads/exits/uninstall"
   ]
 }

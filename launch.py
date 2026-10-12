@@ -75,7 +75,7 @@ def main():
                         break
                 with opener.open(probe_url, timeout=1) as response:
                     models = json.load(response)
-                if len(models) == 2 and {item["kind"] for item in models} == {"image", "video"}:
+                if len(models) >= 2 and {item["kind"] for item in models} == {"image", "video"}:
                     ready = True
                     break
             except (OSError, ValueError, urllib.error.URLError):

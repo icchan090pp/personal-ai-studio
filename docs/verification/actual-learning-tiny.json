@@ -1,0 +1,51 @@
+{
+  "project": "e7b4dac1aa9542de974f64eda1a7b386",
+  "model": "tiny",
+  "jobs": [
+    {
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": null,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 35.65,
+      "job_id": "c35e526ae6a7402586c6d7dcaf9f8555",
+      "wall_seconds": 38.61
+    },
+    {
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": "c35e526ae6a7402586c6d7dcaf9f8555",
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 32.31,
+      "job_id": "7536a547f4644c1283838c9cfd703da9",
+      "wall_seconds": 34.49
+    },
+    {
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": "7536a547f4644c1283838c9cfd703da9",
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 27.16,
+      "job_id": "ba4b5b1e710d4588b454452fd28ce5f6",
+      "wall_seconds": 29.31
+    }
+  ],
+  "peak_worker_rss_gb": 2.824,
+  "adapter_changed": true,
+  "image_size": [
+    256,
+    256
+  ]
+}

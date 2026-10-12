@@ -28,6 +28,8 @@ from studio.curriculum import MODULES
 from studio.hardware import fallback_state, inspect_system, selected_backend
 from studio.presets import LEVELS
 from studio.public_models import PUBLIC_MODELS, catalog
+from studio.training_models import IMAGE_TRAINING_MODELS, VIDEO_TRAINING_MODELS, video_catalog
+from studio.training_models import catalog as training_catalog
 from studio.updates import CURRENT_VERSION, check_update
 
 BASE_MODEL = "stable-diffusion-v1-5/stable-diffusion-v1-5"
@@ -42,6 +44,9 @@ class ProjectInput(BaseModel):
 
 
 class TrainingInput(BaseModel):
+    training_model: Literal["tiny", "small", "sd15", "dreamshaper"] | None = None
+    video_model: Literal["animatediff", "cogvideo"] | None = None
+    start_job_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
     target: Literal["image", "video", "audio", "voice"] = "image"
     instruction: str = Field(default="", max_length=2000)
     level: Literal["normal", "power", "excellent", "ultra"] | None = None
@@ -57,6 +62,9 @@ class TrainingInput(BaseModel):
 
 
 class GenerationInput(BaseModel):
+    video_model: Literal["animatediff", "cogvideo"] | None = None
+    compare_before: bool = False
+    trained_job_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
     public_model: Literal["tiny", "sdxl", "ssd", "pixart", "ltx"] | None = None
     audio_model: Literal["audioldm2", "kokoro"] | None = None
     use_voice: bool = False
@@ -138,6 +146,12 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         columns = {row[1] for row in db.execute("PRAGMA table_info(projects)")}
         if "level" not in columns:
             db.execute("ALTER TABLE projects ADD COLUMN level TEXT DEFAULT 'normal'")
+        if "training_model" not in columns:
+            db.execute("ALTER TABLE projects ADD COLUMN training_model TEXT DEFAULT 'tiny'")
+        if "video_training_model" not in columns:
+            db.execute(
+                "ALTER TABLE projects ADD COLUMN video_training_model TEXT DEFAULT 'animatediff'"
+            )
         for column in ("rules_prompt", "negative_rules", "training_instruction"):
             if column not in columns:
                 db.execute(f"ALTER TABLE projects ADD COLUMN {column} TEXT DEFAULT ''")
@@ -159,6 +173,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             return False
 
     process_guard = threading.RLock()
+    model_guard = threading.Lock()
     active_processes = {}
 
     def stop_process(process):
@@ -207,6 +222,10 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                                 "-m",
                                 "studio.compat"
                                 if config.get("public_model") == "tiny"
+                                else "studio.laptop_video"
+                                if config.get("video_model") == "animatediff"
+                                else "studio.image_learning"
+                                if config.get("training_model")
                                 else "studio.gpu",
                                 "--data",
                                 str(root),
@@ -228,9 +247,13 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                         continue
                     if result.returncode:
                         # Keep full diagnostics local rather than exposing paths or tokens in API.
-                        raise RuntimeError(
-                            "AI処理に失敗しました。PC環境の診断とジョブのログを確認してください。"
+                        error_file = folder / "error.json"
+                        message = (
+                            json.loads(error_file.read_text(encoding="utf-8"))["message"]
+                            if error_file.is_file()
+                            else "AI処理に失敗しました。PC環境の診断とジョブのログを確認してください。"
                         )
+                        raise RuntimeError(message)
                     expected = {
                         "train": "adapter.zip",
                         "video_train": "adapter.zip",
@@ -451,28 +474,37 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         )
         return {"module_id": module_id, "done": body.done, "notes": body.notes}
 
+    class TrainingChoice(BaseModel):
+        training_model: Literal["tiny", "small", "sd15", "dreamshaper"]
+
+    @app.patch("/api/projects/{project_id}/training-model")
+    def training_choice(project_id: str, body: TrainingChoice):
+        project_or_404(project_id)
+        query("UPDATE projects SET training_model=? WHERE id=?", (body.training_model, project_id))
+        return body.model_dump()
+
     @app.get("/api/models")
     def model_catalog():
-        return [
-            {
-                "id": BASE_MODEL,
-                "name": "Stable Diffusion 1.5",
-                "kind": "image",
-                "trainable": True,
-                "weights_url": f"https://huggingface.co/{BASE_MODEL}",
-            },
-            {
-                "id": VIDEO_MODEL,
-                "name": "CogVideoX-5b-I2V",
-                "kind": "video",
-                "trainable": True,
-                "weights_url": f"https://huggingface.co/{VIDEO_MODEL}",
-            },
-        ]
+        return training_catalog() + video_catalog()
+
+    class VideoTrainingChoice(BaseModel):
+        video_model: Literal["animatediff", "cogvideo"]
+
+    @app.patch("/api/projects/{project_id}/video-training-model")
+    def video_training_choice(project_id: str, body: VideoTrainingChoice):
+        project_or_404(project_id)
+        query(
+            "UPDATE projects SET video_training_model=? WHERE id=?", (body.video_model, project_id)
+        )
+        return body.model_dump()
 
     @app.get("/api/public-models")
     def public_model_catalog():
         return catalog()
+
+    @app.get("/api/video-models")
+    def video_model_catalog():
+        return video_catalog()
 
     @app.get("/api/audio-models")
     def audio_catalog():
@@ -491,12 +523,20 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         project_or_404(project_id)
         from studio.assistant import ask
 
+        if not model_guard.acquire(blocking=False):
+            raise HTTPException(409, "エージェントが応答中です。完了してから実行してください。")
         try:
+            if query("SELECT id FROM jobs WHERE status IN ('queued','running')", one=True):
+                raise HTTPException(
+                    409, "学習・生成の完了後に相談してください。メモリを順番に使います。"
+                )
             answer = ask(body.model, body.prompt, body.level)
         except (OSError, ValueError, RuntimeError) as exc:
             raise HTTPException(
                 503, "ローカルOllamaを起動し、モデルを取得してください。" + str(exc)
             ) from exc
+        finally:
+            model_guard.release()
         return {"answer": answer, "model": body.model}
 
     @app.get("/api/projects")
@@ -924,26 +964,48 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 503,
                 "『PC環境・AI機能』を開き、日本語音声・声質機能を追加してください。CPUでも利用できます。",
             )
-        compatible_image = kind == "image" and config.get("public_model") == "tiny"
+        training_base = IMAGE_TRAINING_MODELS.get(config.get("training_model"), {})
+        cpu_learning = kind in {"train", "image"} and training_base.get("backend") == "cpu"
+        cpu_video = kind in {"video_train", "video"} and config.get("video_model") == "animatediff"
+        if cpu_video:
+            training_base = VIDEO_TRAINING_MODELS["animatediff"]
+        compatible_image = (
+            (kind == "image" and config.get("public_model") == "tiny") or cpu_learning or cpu_video
+        )
         if compatible_image and not inspect_system()["cpu_ready"]:
             raise HTTPException(
                 503,
-                "『PC環境・AI機能』からこのPCのAI機能をセットアップしてください。Tiny-SDはCPUでも画像生成できます。",
+                "『PC環境・AI機能』からこのPCのAI機能をセットアップしてください。Tiny-SD・Small-SDはCPUで画像の追加学習・生成ができます。",
             )
+        if cpu_learning or cpu_video:
+            ram = inspect_system().get("ram_gb")
+            # Integrated GPUs reserve some of installed RAM; tolerate that reservation.
+            if ram and ram < training_base["ram_gb"] * 0.9:
+                raise HTTPException(
+                    422,
+                    f"{training_base['name']}の目安はRAM {training_base['ram_gb']}GB以上です。このPCは約{ram}GBです。Tiny-SDを選ぶか、メモリの多いPCをご利用ください。",
+                )
         if not cpu_voice and not compatible_image and not gpu_available():
             raise HTTPException(
                 503,
-                "この機能にはNVIDIA CUDA GPUが必要です。AMD・Intelでは『Tiny-SD / 軽量画像』またはCPU音声を選んでください。『PC環境・AI機能』で導入・診断できます。",
+                "この機能にはNVIDIA CUDA GPUが必要です。画像の学習では『Tiny-SD / 軽量・CPU学習』または『Small-SD / CPU学習』を選んでください。『PC環境・AI機能』で導入・診断できます。",
             )
         job_id = uuid.uuid4().hex
-        with sqlite3.connect(db_path) as db:
-            db.execute("BEGIN IMMEDIATE")
-            if db.execute("SELECT id FROM jobs WHERE status IN ('queued','running')").fetchone():
-                raise HTTPException(409, "別の処理が実行中です。完了してから実行してください。")
-            db.execute(
-                "INSERT INTO jobs(id,project_id,kind,status,config) VALUES(?,?,?,'queued',?)",
-                (job_id, project_id, kind, json.dumps(config)),
-            )
+        if not model_guard.acquire(blocking=False):
+            raise HTTPException(409, "エージェントが応答中です。完了してから実行してください。")
+        try:
+            with sqlite3.connect(db_path) as db:
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute(
+                    "SELECT id FROM jobs WHERE status IN ('queued','running')"
+                ).fetchone():
+                    raise HTTPException(409, "別の処理が実行中です。完了してから実行してください。")
+                db.execute(
+                    "INSERT INTO jobs(id,project_id,kind,status,config) VALUES(?,?,?,'queued',?)",
+                    (job_id, project_id, kind, json.dumps(config)),
+                )
+        finally:
+            model_guard.release()
         if run_workers:
             threading.Thread(target=worker, daemon=True).start()
         return query("SELECT * FROM jobs WHERE id=?", (job_id,), True)
@@ -974,7 +1036,58 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     @app.post("/api/projects/{project_id}/train", status_code=202)
     def train(project_id: str, body: TrainingInput):
         project_or_404(project_id)
+        if body.video_model and body.target != "video":
+            raise HTTPException(422, "動画モデルは動画学習で選択してください")
+        if body.target == "video" and body.video_model:
+            if body.training_model:
+                raise HTTPException(422, "動画学習には動画の基盤モデルを選択してください")
+            if body.mode not in {"supervised", "imitation", "style"}:
+                raise HTTPException(422, "動画は、かんたん・写し・スタイル学習に対応しています")
+            rows = query("SELECT * FROM media WHERE project_id=? AND kind='video'", (project_id,))
+            if body.group:
+                rows = [row for row in rows if row["group_name"] == body.group]
+            if len(rows) < 3:
+                raise HTTPException(422, "動画の学習ファイルを3件以上追加してください")
+            selected = VIDEO_TRAINING_MODELS[body.video_model]
+            config = {
+                **body.model_dump(),
+                "media": rows,
+                "base_model": selected["id"],
+                "base_revision": selected.get("revision"),
+                "motion_model": selected.get("motion_model"),
+                "motion_revision": selected.get("motion_revision"),
+                "instruction": body.instruction
+                or project_or_404(project_id)["training_instruction"],
+                "level": body.level or project_or_404(project_id)["level"],
+            }
+            if body.start_job_id:
+                parent = query(
+                    "SELECT config FROM jobs WHERE id=? AND project_id=? AND kind='video_train' AND status='completed'",
+                    (body.start_job_id, project_id),
+                    True,
+                )
+                if not parent:
+                    raise HTTPException(
+                        422, "このプロジェクトの完成した動画モデルを選択してください"
+                    )
+                previous = json.loads(parent["config"])
+                if previous.get("video_model", "cogvideo") != body.video_model:
+                    raise HTTPException(422, "続きから育てるモデルと動画の基盤モデルが一致しません")
+                for key in (
+                    "rank",
+                    "base_model",
+                    "base_revision",
+                    "motion_model",
+                    "motion_revision",
+                ):
+                    if key in previous:
+                        config[key] = previous[key]
+            return enqueue(project_id, "video_train", config)
         if body.target != "image":
+            if body.training_model or body.start_job_id:
+                raise HTTPException(
+                    422, "画像用の基盤モデル・完成モデルは画像学習で選択してください"
+                )
             if body.mode not in {"supervised", "imitation", "style"}:
                 raise HTTPException(
                     422, "音声・動画学習は、かんたん・写し・スタイル学習を選択してください"
@@ -1008,16 +1121,62 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 422, "生成した作品を1〜5で評価してから、評価を使った学習を実行してください"
             )
         start = None
-        base_model = os.getenv("STUDIO_CHECKPOINT", BASE_MODEL)
-        if body.mode == "reinforcement":
+        selected = IMAGE_TRAINING_MODELS.get(body.training_model)
+        identity = {"base_model": os.getenv("STUDIO_CHECKPOINT", BASE_MODEL)}
+        if selected:
+            identity.update(
+                training_model=body.training_model,
+                base_model=selected["id"],
+                base_revision=selected["revision"],
+            )
+        if body.start_job_id:
             start = query(
-                "SELECT id,config FROM jobs WHERE project_id=? AND kind='train' AND status='completed' ORDER BY rowid DESC LIMIT 1",
-                (project_id,),
+                "SELECT id,config FROM jobs WHERE id=? AND project_id=? AND kind='train' AND status='completed'",
+                (body.start_job_id, project_id),
                 True,
             )
             if not start:
-                raise HTTPException(422, "先にモデルを学習して作品を生成・評価してください")
-            base_model = json.loads(start["config"])["base_model"]
+                raise HTTPException(422, "このプロジェクトの完成した画像モデルを選択してください")
+        elif body.mode == "reinforcement":
+            candidates = query(
+                "SELECT id,config FROM jobs WHERE project_id=? AND kind='train' AND status='completed' ORDER BY rowid DESC",
+                (project_id,),
+            )
+            start = next(
+                (
+                    row
+                    for row in candidates
+                    if not body.training_model
+                    or (
+                        json.loads(row["config"]).get("training_model")
+                        or (
+                            "sd15"
+                            if json.loads(row["config"]).get("base_model") == BASE_MODEL
+                            else None
+                        )
+                    )
+                    == body.training_model
+                ),
+                None,
+            )
+            if not start:
+                raise HTTPException(
+                    422, "先に選択した基盤モデルで学習して作品を生成・評価してください"
+                )
+        if start:
+            previous = json.loads(start["config"])
+            previous_key = previous.get("training_model") or (
+                "sd15" if previous.get("base_model") == BASE_MODEL else None
+            )
+            if body.training_model and previous_key != body.training_model:
+                raise HTTPException(
+                    422,
+                    "続きから育てるモデルと基盤モデルが一致しません。完成モデルと同じ基盤を選択してください",
+                )
+            identity = {
+                key: previous[key] for key in ("base_model", "base_revision") if key in previous
+            }
+            identity["training_model"] = previous.get("training_model")
         return enqueue(
             project_id,
             "train",
@@ -1028,7 +1187,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 "level": body.level or project_or_404(project_id)["level"],
                 "rank": json.loads(start["config"]).get("rank", body.rank) if start else body.rank,
                 "images": rows,
-                "base_model": base_model,
+                **identity,
                 "start_job_id": start["id"] if start else None,
             },
         )
@@ -1036,6 +1195,10 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     @app.post("/api/projects/{project_id}/generate", status_code=202)
     def generate(project_id: str, body: GenerationInput):
         project_or_404(project_id)
+        if body.video_model and (body.kind != "video" or body.public_model):
+            raise HTTPException(422, "動画の基盤モデルは独自モデルの動画生成で選択してください")
+        if body.video_model == "animatediff" and body.with_audio and body.audio_model != "kokoro":
+            raise HTTPException(422, "ノートPCの音付き動画はKokoro日本語読み上げを選択してください")
         if body.use_voice and body.audio_model != "kokoro":
             raise HTTPException(422, "声質の反映にはKokoro読み上げモデルを選択してください")
         voice = (
@@ -1076,17 +1239,53 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             )
         ):
             raise HTTPException(422, "先に音声モデルを学習してください")
-        if (
-            not body.public_model
-            and body.kind != "audio"
-            and not query(
-                "SELECT id FROM jobs WHERE project_id=? AND kind='train' AND status='completed'",
-                (project_id,),
-                True,
-            )
+        trained = None
+        if body.trained_job_id and (
+            body.public_model
+            or body.kind == "audio"
+            or (body.kind == "video" and not body.video_model)
         ):
-            raise HTTPException(422, "先にモデルを学習してください")
-        if body.kind == "video" and not body.public_model:
+            raise HTTPException(
+                422, "完成した画像モデルは『自分で学習したモデル』の画像生成で選択してください"
+            )
+        if body.video_model:
+            candidates = query(
+                "SELECT id,config FROM jobs WHERE project_id=? AND kind='video_train' AND status='completed' ORDER BY rowid DESC",
+                (project_id,),
+            )
+            trained = next(
+                (
+                    row
+                    for row in candidates
+                    if (not body.trained_job_id or row["id"] == body.trained_job_id)
+                    and json.loads(row["config"]).get("video_model", "cogvideo") == body.video_model
+                ),
+                None,
+            )
+            if not trained:
+                raise HTTPException(
+                    422,
+                    "このプロジェクトの完成した動画モデルを選択してください。先に動画モデルを育ててください",
+                )
+        elif not body.public_model and body.kind != "audio":
+            if body.trained_job_id:
+                trained = query(
+                    "SELECT id,config FROM jobs WHERE id=? AND project_id=? AND kind='train' AND status='completed'",
+                    (body.trained_job_id, project_id),
+                    True,
+                )
+            else:
+                trained = query(
+                    "SELECT id,config FROM jobs WHERE project_id=? AND kind='train' AND status='completed' ORDER BY rowid DESC LIMIT 1",
+                    (project_id,),
+                    True,
+                )
+            if not trained:
+                raise HTTPException(
+                    422,
+                    "このプロジェクトの完成した画像モデルを選択してください。先にモデルを学習してください",
+                )
+        if body.kind == "video" and not body.public_model and body.video_model != "animatediff":
             source = query(
                 "SELECT * FROM jobs WHERE id=? AND project_id=? AND kind='image' "
                 "AND status='completed'",
@@ -1097,6 +1296,28 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 raise HTTPException(422, "動画の元になる生成済み画像を選んでください")
         project = project_or_404(project_id)
         config = body.model_dump()
+        if trained and (body.kind == "image" or body.video_model):
+            previous = json.loads(trained["config"])
+            config.update(
+                {
+                    key: previous[key]
+                    for key in (
+                        "training_model",
+                        "base_model",
+                        "base_revision",
+                        "motion_model",
+                        "motion_revision",
+                    )
+                    if key in previous
+                }
+            )
+            config["trained_job_id"] = trained["id"]
+        if body.compare_before and (
+            body.kind != "image" or body.public_model or not config.get("training_model")
+        ):
+            raise HTTPException(
+                422, "育成前後の比較は、この版のアプリで学習した画像モデルを選択してください"
+            )
         config["voice_job_id"] = voice["id"] if voice else None
         config["level"] = body.level or project["level"]
         preset = LEVELS[config["level"]]
@@ -1204,6 +1425,32 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             row["model_name"] = AUDIO_MODELS.get(selected, PUBLIC_MODELS.get(selected, {})).get(
                 "name", ""
             )
+            row["training_model"] = config.get("training_model") or (
+                "sd15"
+                if row["kind"] == "train" and config.get("base_model") == BASE_MODEL
+                else None
+            )
+            row["base_model"] = config.get("base_model")
+            row["video_model"] = config.get("video_model") or (
+                "cogvideo" if row["kind"] == "video_train" else None
+            )
+            row["base_revision"] = config.get("base_revision")
+            row["trained_job_id"] = config.get("trained_job_id")
+            row["has_comparison"] = (
+                row["status"] == "completed"
+                and bool(config.get("compare_before"))
+                and (root / "jobs" / row["id"] / "before.png").is_file()
+            )
+            if row["has_comparison"]:
+                row["comparison_seed"] = config["seed"]
+                row["comparison_prompt"] = config["prompt"]
+            row["start_job_id"] = config.get("start_job_id")
+            if config.get("training_model"):
+                row["model_name"] = IMAGE_TRAINING_MODELS[config["training_model"]]["name"]
+            elif row["video_model"]:
+                row["model_name"] = VIDEO_TRAINING_MODELS[row["video_model"]]["name"]
+            elif row["kind"] == "train":
+                row["model_name"] = config.get("base_model", "SD 1.5")
             row["voice_applied"] = bool(config.get("voice_job_id"))
             execution = root / "jobs" / row["id"] / "execution.json"
             if selected == "tiny" and row["status"] == "completed" and execution.is_file():
@@ -1222,6 +1469,20 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             )
         return rows
 
+    @app.get("/api/jobs/{job_id}/before")
+    def comparison_before(job_id: str, download: bool = False):
+        job = query("SELECT * FROM jobs WHERE id=?", (job_id,), True)
+        if (
+            not job
+            or job["status"] != "completed"
+            or not json.loads(job["config"]).get("compare_before")
+        ):
+            raise HTTPException(404, "比較画像はまだありません")
+        path = root / "jobs" / job_id / "before.png"
+        if not path.is_file():
+            raise HTTPException(404, "比較画像が見つかりません")
+        return FileResponse(path, filename="before.png" if download else None)
+
     @app.get("/api/jobs/{job_id}/result")
     def result(job_id: str, download: bool = False):
         job = query("SELECT * FROM jobs WHERE id=?", (job_id,), True)
@@ -1239,6 +1500,9 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         name = names[job["kind"]]
         return FileResponse(root / "jobs" / job_id / name, filename=name if download else None)
 
+    from studio.agent_learning import register_agent_routes
+
+    register_agent_routes(app, db_path, query, project_or_404, model_guard)
     return app
 
 

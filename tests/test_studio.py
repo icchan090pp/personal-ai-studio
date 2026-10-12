@@ -144,7 +144,7 @@ def test_cross_origin_upload_is_rejected(studio, monkeypatch):
         assert connected.status_code == 303
         assert "HttpOnly" in connected.headers["set-cookie"]
         assert connected.headers["referrer-policy"] == "no-referrer"
-        assert len(paired.get("/api/models").json()) == 2
+        assert len(paired.get("/api/models").json()) == 6
         assert (
             paired.post(
                 "/api/projects",

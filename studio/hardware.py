@@ -44,7 +44,7 @@ def memory_guidance(ram):
         return "RAM 8GB未満です。画像生成はメモリ不足になる可能性があります。画像整理・コースから始め、不要なアプリを終了してください。"
     if ram < 16:
         return "RAM 8〜16GBのPCではTiny-SD・ノーマルを推奨します。他のアプリを閉じ、1件ずつ生成してください。"
-    return "軽量画像の目安はRAM 8GB以上です。16GBでも大型モデル・動画には別途十分なGPUメモリが必要です。"
+    return "Tiny-SDはRAM 8GB、Small-SDは12GB、AnimateDiffの短い動画は16GB以上が目安です。大型モデル・CogVideoXには別途十分なGPUメモリが必要です。"
 
 
 def run_json(command, timeout=20):
@@ -147,7 +147,7 @@ def describe(names, libraries, cuda, cpu, dml, cuda_build=None):
         code, label, message = (
             "directml_ready",
             "DirectML GPU",
-            "軽量画像（Tiny-SD）はDirectML GPUを使用します。演算非対応・メモリ不足時はCPUで再試行します。動画・大型モデル・画像LoRA学習はCUDA GPUが必要です。",
+            "軽量画像（Tiny-SD）はDirectML GPUを使用します。演算非対応・メモリ不足時はCPUで再試行します。Tiny-SD・Small-SDの画像LoRA学習とAnimateDiffの短い動画はCPUで実行できます。CogVideoX・大型モデルはCUDA GPUが必要です。",
         )
     elif not libraries or not cpu:
         code, label = "setup_required", "AI機能の準備が必要"
@@ -165,7 +165,7 @@ def describe(names, libraries, cuda, cpu, dml, cuda_build=None):
         )
     else:
         code, label = "cpu_ready", "CPU互換モード"
-        message = "軽量画像（Tiny-SD）と日本語音声はCPUで利用できます。AMD・Intel GPUはCUDA非対応です。DirectMLを導入して対応GPUを確認できます。動画・大型モデル・画像LoRA学習にはCUDA GPUが必要です。"
+        message = "軽量画像（Tiny-SD）と日本語音声はCPUで利用できます。AMD・Intel GPUはCUDA非対応です。DirectMLを導入して対応GPUを確認できます。Tiny-SD・Small-SDの画像LoRA学習とAnimateDiffの短い動画はCPUで実行できます。CogVideoX・大型モデルにはCUDA GPUが必要です。"
     return {
         "code": code,
         "label": label,

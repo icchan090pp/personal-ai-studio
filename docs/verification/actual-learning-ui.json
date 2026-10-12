@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "trained": "ad05690eb314402fa066ca167fa2e1f2",
+  "generated": "c101793676c54c0e8015766aa78c5d26",
+  "execution": {
+    "backend": "cpu",
+    "model": "segmind/tiny-sd",
+    "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+    "adapter_id": "ad05690eb314402fa066ca167fa2e1f2",
+    "native_resolution": [
+      256,
+      256
+    ],
+    "elapsed_seconds": 28.2
+  },
+  "errors": []
+}

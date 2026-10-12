@@ -20,11 +20,20 @@ from tests.test_studio_matrix import gpu_readiness_only, ready_dataset
 def test_two_model_catalog(studio, monkeypatch):
     client, _root = studio
     models = client.get("/api/models").json()
-    assert len(models) == 2
+    assert len(models) == 6
+    from tests.check_image_learning import check_image_learning
+
+    check_image_learning(client, _root, monkeypatch)
+    from tests.check_agent_video import check_agent_contract, check_video_contract
+
+    check_agent_contract(client, _root, monkeypatch)
+    check_video_contract(client, _root, monkeypatch)
     assert {model["kind"] for model in models} == {"image", "video"}
     assert models[0]["trainable"] is True
     assert models[1]["trainable"] is True
-    assert all(model["weights_url"].endswith(model["id"]) for model in models)
+    assert all(
+        model["weights_url"].endswith(model.get("motion_model", model["id"])) for model in models
+    )
     audio_models = client.get("/api/audio-models").json()
     assert {m["key"] for m in audio_models} == {"audioldm2", "kokoro"}
     assert all(m["license"] and m["revision"] and not m["trainable"] for m in audio_models)
@@ -571,6 +580,9 @@ def test_real_video_encoder_preserves_frames_and_timing(tmp_path):
             assert reader.get_meta_data()["size"] == RESOLUTIONS[resolution]
     video_frames = extract_media(path.read_bytes(), "video/mp4", "video")
     assert len(video_frames) == 3 and video_frames[0].size == (64, 64)
+    from tests.check_agent_video import check_motion_optimizer
+
+    check_motion_optimizer(tmp_path)
     # Real tiny CogVideoX attention adapter optimization, preserving base weights.
     import torch
     from diffusers import (

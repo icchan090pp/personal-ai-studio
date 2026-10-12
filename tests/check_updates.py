@@ -28,17 +28,17 @@ def release(tag, content=b"MZverified-installer"):
 
 
 def check_updates(root, monkeypatch):
-    newer, old = release("v0.1.6"), release("v0.1.3")
+    newer, old = release("v0.1.7"), release("v0.1.3")
     assert updates.select_release([old, newer])["available"]
     assert not updates.select_release([old])["available"]
-    assert not updates.select_release([release("v0.1.5")])["available"]
+    assert not updates.select_release([release("v0.1.6")])["available"]
     assert updates.select_release([release("v0.1.10"), newer])["latest"] == "0.1.10"
-    bad = release("v0.1.7")
+    bad = release("v0.1.8")
     bad["assets"][0]["browser_download_url"] = "https://example.com/malicious.exe"
-    assert updates.select_release([newer, bad])["latest"] == "0.1.6"
+    assert updates.select_release([newer, bad])["latest"] == "0.1.7"
     assert updates.version("../../evil") is None
     with pytest.raises(ValueError):
-        updates.select_release([{"tag_name": "v0.1.7", "assets": []}])
+        updates.select_release([{"tag_name": "v0.1.8", "assets": []}])
     content = b"MZverified-installer"
     item = updates.select_release([newer])
     expected = hashlib.sha256(content).hexdigest()
@@ -53,7 +53,7 @@ def check_updates(root, monkeypatch):
                 else io.BytesIO(checksum if url.endswith(".txt") else content)
             ),
         )
-        assert updates.check_update()["latest"] == "0.1.6"
+        assert updates.check_update()["latest"] == "0.1.7"
         progress = []
         path = updates.download_update(item, root / "updates", progress.append)
         assert path.read_bytes() == content and progress[-1] == 100

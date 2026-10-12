@@ -195,3 +195,9 @@ def test_real_optimizer_export_reload_and_inference(tmp_path, monkeypatch):
         assert (mode_folder / "adapter.zip").is_file()
         if before:
             assert any(not torch.equal(before[key], mode_state[key]) for key in before)
+
+    from tests.check_image_learning import check_comparison_worker
+
+    check_comparison_worker(
+        tmp_path / "comparison", folder / "adapter", lambda: tiny_pipeline(tmp_path), monkeypatch
+    )

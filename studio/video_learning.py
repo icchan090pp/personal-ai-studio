@@ -42,14 +42,18 @@ def optimize_video(
     from peft import LoraConfig
 
     transformer.requires_grad_(False)
-    transformer.add_adapter(
-        LoraConfig(
-            r=config["rank"],
-            lora_alpha=config["rank"],
-            target_modules=["to_q", "to_k", "to_v", "to_out.0"],
-            init_lora_weights=True,
+    if getattr(transformer, "peft_config", None):
+        for name, parameter in transformer.named_parameters():
+            parameter.requires_grad_("lora_" in name)
+    else:
+        transformer.add_adapter(
+            LoraConfig(
+                r=config["rank"],
+                lora_alpha=config["rank"],
+                target_modules=["to_q", "to_k", "to_v", "to_out.0"],
+                init_lora_weights=True,
+            )
         )
-    )
     transformer.enable_gradient_checkpointing()
     parameters = [parameter for parameter in transformer.parameters() if parameter.requires_grad]
     for parameter in parameters:
@@ -107,6 +111,10 @@ def train_video(root, project, config, folder, progress, report):
     pipe = CogVideoXImageToVideoPipeline.from_pretrained(
         "THUDM/CogVideoX-5b-I2V", torch_dtype=torch.bfloat16
     )
+    if config.get("start_job_id"):
+        pipe.load_lora_weights(
+            str(root / "jobs" / config["start_job_id"] / "adapter"), adapter_name="default"
+        )
     pipe.vae.enable_tiling()
     pipe.vae.enable_slicing()
     cached = []

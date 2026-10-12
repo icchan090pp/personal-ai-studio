@@ -170,7 +170,7 @@ def generate_sound(
     write_audio(destination, waveform[0, 0].cpu().numpy())
 
 
-def mux_audio(video, audio):
+def mux_audio(video, audio, *, loop_video=False):
     import imageio_ffmpeg
 
     temporary = video.with_name("with-sound.mp4")
@@ -181,6 +181,7 @@ def mux_audio(video, audio):
             "error",
             "-nostdin",
             "-y",
+            *(["-stream_loop", "-1"] if loop_video else []),
             "-i",
             str(video),
             "-i",

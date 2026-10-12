@@ -19,7 +19,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $destination = Join-Path $env:RUNNER_TEMP 'DeeL 試験 with spaces'
-          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe'
+          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe'
           $fresh = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -PassThru -Wait
           if ($fresh.ExitCode -ne 0) { throw 'Fresh install failed' }
           $freshApp = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList @('--smoke-test', '--smoke-basic') -PassThru
@@ -28,15 +28,15 @@ jobs:
           $freshUninstall = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -PassThru -Wait
           if ($freshUninstall.ExitCode -ne 0) { throw 'Fresh uninstall failed' }
           $previous = Join-Path $env:RUNNER_TEMP 'previous-setup.exe'
-          Invoke-WebRequest 'https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.4/DeeL-Pyess-Setup-v0.1.4-Windows-x64.exe' -OutFile $previous
-          if ((Get-FileHash $previous -Algorithm SHA256).Hash.ToLower() -ne 'c43f380766ac3184b21f57b5acc8d18a2ce3a9fce508db398d39c30325150bd4') { throw 'Previous release checksum mismatch' }
+          Invoke-WebRequest 'https://github.com/icchan090pp/personal-ai-studio/releases/download/v0.1.5/DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe' -OutFile $previous
+          if ((Get-FileHash $previous -Algorithm SHA256).Hash.ToLower() -ne '94850753a9df4644e9a8d0fc45fb0f48b3e2a00ae412d11562c4f6b4ccc33cec') { throw 'Previous release checksum mismatch' }
           $oldSetup = Start-Process -FilePath $previous -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -PassThru -Wait
           if ($oldSetup.ExitCode -ne 0) { throw 'Previous version install failed' }
           $oldApp = Start-Process -FilePath "$destination/DeeL Pyess.exe" -ArgumentList @('--smoke-test', '--smoke-basic') -PassThru
           if (-not $oldApp.WaitForExit(120000) -or $oldApp.ExitCode -ne 0) { throw 'Previous version seed failed' }
           $database = "$env:LOCALAPPDATA/DeeL Pyess/data/studio.sqlite3"
           $before = (Get-FileHash $database -Algorithm SHA256).Hash
-          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe'
+          $installer = Resolve-Path 'artifacts/release/DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe'
           $setup = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           if ((Get-FileHash $database -Algorithm SHA256).Hash -ne $before) { throw 'Upgrade modified user database' }
@@ -51,6 +51,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Isolated DirectML runtime failed' }
           & "$destination/runtime/python.exe" -c "import torch; assert torch.__version__.startswith('2.7.0+cpu'); print('CPU runtime preserved')"
           if ($LASTEXITCODE -ne 0) { throw 'DirectML altered primary Torch runtime' }
+          & "$destination/runtime/python.exe" "$env:GITHUB_WORKSPACE/scripts/smoke-image-learning.py" --app $destination --data "$env:RUNNER_TEMP/learning-smoke" --report "$env:GITHUB_WORKSPACE/artifacts/release/windows-cpu-learning.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Real CPU LoRA training/reload/generation failed' }
           Pop-Location
           # Prove launching does not depend on a preinstalled Python in PATH.
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"

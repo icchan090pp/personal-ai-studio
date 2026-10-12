@@ -1,0 +1,20 @@
+{
+  "backend": "cpu",
+  "model": "segmind/tiny-sd",
+  "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+  "adapter_id": "ad05690eb314402fa066ca167fa2e1f2",
+  "comparison": true,
+  "seed": 42,
+  "prompt": "a blue circle in the style of circleart, dark background",
+  "inference_steps": 20,
+  "native_resolution": [
+    256,
+    256
+  ],
+  "elapsed_seconds": 65.31,
+  "passed": true,
+  "job_id": "ff0c8e54922148e684634333795a29fe",
+  "before_sha256": "9a3bef287f59376c6654c38654ccc304b95371f1064f7874bbd37f93210b38ce",
+  "after_sha256": "0e383ef9c60bb3512b69dfdff0c71d49d58217be543e3e52561910d0eb62d916",
+  "browser_errors": []
+}

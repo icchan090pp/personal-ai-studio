@@ -2,11 +2,11 @@
 
 独自の画像・動画モデルを育てるローカルアプリ。Windowsは専用ウィンドウ、Linuxはブラウザで操作できます。スマートフォン接続はソース版で利用します。
 初期検証版です。**100件の製品試験を5回連続で実行**し、全件合格しました。検証スクリプトとJUnit記録を同梱します。
-CUDA実機・実サイズの基盤モデルによる学習／生成品質・個人のWindows実機でのGPU機能は未検証です。Windowsセットアップと基本起動はWindows CIで確認しました。
+CUDA実機・大型基盤モデルによるGPU学習／生成品質・個人のWindows実機でのGPU機能は未検証です。Windowsセットアップと基本起動はWindows CIで確認しました。
 
 ## 機能
 
-- SD 1.5画像LoRA、CogVideoX-5b-I2V動画LoRAと生成。実験用の短い効果音・環境音モデルの学習／動画への付加
+- Tiny-SD・Small-SDのCPU画像LoRA、SD 1.5・DreamShaper 8のCUDA画像LoRA、CogVideoX-5b-I2V動画LoRAと生成。実験用の短い効果音・環境音モデルの学習／動画への付加
 - エクスプローラー・フォルダ投稿、グルーピング、指定サイト内収集、Wikimedia Commons検索、出典保存
 - 画像は通常・半教師ありBLIP・スタイル・RWR・生成テスト・写し学習。動画／音声は説明付き通常・写し・スタイル学習
 - 学習チャットと生成チャットを分離し、モデルごとの履歴を保存
@@ -19,7 +19,7 @@ CUDA実機・実サイズの基盤モデルによる学習／生成品質・個�
 
 ## Windowsへのインストール・更新
 
-[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe` を取得して実行してください。
+[Releases](https://github.com/icchan090pp/personal-ai-studio/releases) から `DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe` を取得して実行してください。
 Windows 10/11・64bit用、Python同梱です。既存のDeeL Pyessを終了し、同じ保存先へ上書き更新できます。
 デスクトップの「DeeL Pyess」で起動し、「このPCのAI機能をセットアップ」を実行します。
 投稿データ・完成モデルは `%LOCALAPPDATA%\DeeL Pyess\data`、診断ログは同フォルダのstartup.logです。
@@ -40,7 +40,7 @@ GPUの演算非対応・メモリ不足時はCPUで再試行し、使用した�
 失敗したGPU処理は記録し、次回からCPUを優先します。「再診断する」でGPUの再試行を許可できます。
 明示的にCPUを選択してセットアップした場合は、軽量画像をCPUで生成する設定を保持します。
 初回セットアップは数GBのダウンロード、Tiny-SDの重みは約1.3GBです。RAM 8GB以上を目安としてください。
-全GPU・全演算の保証はできません。画像LoRA学習、動画、大型モデルは十分なVRAMを持つCUDA GPUが必要です。
+Tiny-SD・Small-SDの画像LoRA学習と学習後の生成はCPUを使います。学習画面で基盤モデルを選び、3枚以上の画像を投稿してください。まず30ステップ・ランク4で試し、完成モデルの版を選んで継続学習できます。各版は保持されます。Tiny-SDはRAM 8GB、Small-SDは12GB以上が目安です。AnimateDiffの短い動画はCPU・RAM 16GB以上が目安です。SD 1.5・DreamShaper 8の画像学習とCogVideoXは十分なVRAMを持つCUDA GPUが必要です。
 日本語音声と声質特徴抽出はCPUでも利用できます。CPUでは処理に時間がかかります。
 
 ### Linux・開発者向けソース版
@@ -52,22 +52,31 @@ AI機能は仮想環境で `python -m studio.setup_runtime --backend cpu`、NVID
 
 ## モデルと環境
 
-画像モデル：`stable-diffusion-v1-5/stable-diffusion-v1-5`。
-動画モデル：`THUDM/CogVideoX-5b-I2V`。モデル重みはZIPに含まず、初回に配布元から取得します。
+画像の学習基盤：Tiny-SD・Small-SD（CPU）、SD 1.5・DreamShaper 8（CUDA）。
+動画の学習基盤：AnimateDiff v1.5-2 + DreamShaper 8（CPU）、`THUDM/CogVideoX-5b-I2V`（CUDA）。モデル重みはZIPに含まず、初回に配布元から取得します。
 それぞれのモデルライセンス・アクセス条件が適用されます。
-目安：画像VRAM 8GB以上、動画生成16〜24GB以上、動画LoRA学習48〜80GB、RAM32GB以上。
-実際の必要量は機器・モデル・設定で変わります。動画学習では特に大きいGPUとホストRAMが必要です。
+CPUの目安：Tiny-SD RAM8GB、Small-SD RAM12GB、AnimateDiff RAM16GB以上。CUDA画像学習はVRAM16GB、CogVideoXの生成は16〜24GB、学習は48〜80GB VRAM・ホストRAM32GB以上が目安です。実際の必要量は機器・モデル・設定・他のアプリの使用量で変わります。
 
 [Stability Matrix Releases](https://github.com/LykosAI/StabilityMatrix/releases) はモデル管理アプリの配布元です。
 DeeL Pyessは独立アプリとして、管理フォルダにあるSD 1.5 `.safetensors` を読み込みます。
 Windows PowerShellでは `$env:STUDIO_CHECKPOINT="C:\Models\SD15.safetensors"`、
 Linuxでは `STUDIO_CHECKPOINT=/path/to/SD15.safetensors ./start.sh`。SDXL／Flux／SD2は対象外です。
-画像LoRAはDiffusers形式とKohya形式、動画LoRAはCogVideoX Diffusers形式を出力します。
+画像LoRAはDiffusers形式とKohya形式、動画LoRAは選択したAnimateDiffまたはCogVideoXのDiffusers形式を出力します。
 
 実験用の音声学習はゼロから学ぶ小型の波形拡散モデルです。短い効果音の実験用で、自然な会話・声の再現・高品質音楽は対象外。
 学習と生成に同じ説明文を使う条件ID方式で、文章の意味理解や映像との音声同期はしません。
 RWRは報酬重み付き回帰で、PPO／DDPOではありません。深考は生成ステップの多いプリセットです。
 ユーザールールのリセットは共通プロンプトを空にする機能で、基盤モデルの性質は消せません。
+
+## 動画とエージェントの育成
+
+「動画モデル」でAnimateDiffを選び、3本以上の動画を投稿します。256px・4フレームを順序を保って学習し、時間方向と空間方向のattentionへLoRAを最適化します。初期設定は10ステップ・ランク4。完成モデルを学習の出発点に選ぶと続きを育て、別の版として保存します。生成は256px・16フレーム・8fps（約2秒）、720p〜4Kは拡大出力です。CPU処理は数分〜数十分以上かかる場合があります。
+
+生成画面で完成モデルを選び、Kokoroと読み上げる日本語を指定すると音付きMP4を作れます。映像モデルを解放してから音声を合成します。長い音声では映像をループし、ナレーションを切らずに収録します。映像と音声を同時生成するモデルではなく、リップシンクには対応していません。
+
+「エージェント」はOpenAI gpt-oss-20b/120bの指示・知識・お手本を保存し、推論時に反映します。重みの追加学習ではありません。版を選んで応答を試し、評価と修正回答から次の版を作れます。基盤だけの応答との比較と、育成プロフィールのJSON出力に対応。外部操作やコマンドは自動実行しません。
+
+[Ollama](https://ollama.com/download/windows)を別途導入し、`ollama pull gpt-oss:20b` を実行してください。20bはRAM16GB以上、120bは約80GB以上が目安で、他のアプリの使用量によっては不足します。画像・動画ジョブとエージェント推論は同時実行を避けます。CPUでは応答が数分以上かかる場合があります。
 
 ## 開発と検証
 
@@ -88,7 +97,7 @@ Linuxで実行権限がない場合：`chmod +x install.sh start.sh start-phone.
 v0.1.2では、生成専用の公開モデル4種類（SDXL、SSD-1B、PixArt Sigma、LTX-Video）、
 ローカルOllama経由のOpenAI gpt-oss-20b/120b学習相談、ウルトラ（画像・動画200ステップ）、
 データを保持する学習停止・リセットを追加しました。追加4モデルのLoRA学習は未対応です。
-公開モデルの実サイズGPU生成・gpt-ossの実推論は本CPU開発環境では未検証です。
+公開モデルの実サイズGPU生成は本CPU開発環境では未検証です。エージェントを含む実モデルの確認範囲は、公開版の検証レポートに記録します。
 
 音声生成にAudioLDM2 Large（非商用の効果音）とKokoro 82M（日本語読み上げ）を追加。
 OpenVoice V2で参照音声の声質特徴を取り込み、速度・高さの対応指示を保存して読み上げへ反映。
