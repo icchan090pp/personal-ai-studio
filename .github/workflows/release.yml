@@ -6,11 +6,66 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: read
+env:
+  VERIFIED_WINDOWS_RUN: "38192052646"
+  VERIFIED_TEST_RUN: "38192052601"
+  VERIFIED_SOURCE: "c6cc2f62d48ddee5a170ce73978778cec7370ce0"
 jobs:
   verify_release:
-    uses: ./.github/workflows/verify.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm five passing runs on identical application source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_TEST_RUN" > "$RUNNER_TEMP/test-run.json"
+          python - <<'PYCODE'
+          import json, os, pathlib, subprocess
+          run = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'test-run.json').read_text())
+          assert run['status'] == 'completed' and run['conclusion'] == 'success', 'Product verification must pass before publication'
+          assert run['head_sha'] == os.environ['VERIFIED_SOURCE'], 'Unexpected tested source'
+          assert run['path'] == '.github/workflows/verify.yml' and run['event'] == 'push'
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '-z', os.environ['VERIFIED_SOURCE'], 'HEAD']).decode().split('\0')
+          forbidden = [p for p in changed if p and not p.startswith(('docs/', 'website/')) and p != '.github/workflows/release.yml']
+          assert not forbidden, 'Application source changed after verification: ' + repr(forbidden)
+          PYCODE
+      - uses: actions/download-artifact@v4
+        with:
+          name: verification
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.VERIFIED_TEST_RUN }}
+          path: artifacts/verified
+      - name: Validate five CI reports with exactly 100 passed each
+        run: |
+          for report in artifacts/verified/verification/run-{1..5}/results.xml; do
+            python scripts/check-results.py "$report"
+          done
   verify_windows:
-    uses: ./.github/workflows/windows.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm successful Windows test and identical application source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_WINDOWS_RUN" > "$RUNNER_TEMP/windows-run.json"
+          python - <<'PYCODE'
+          import json, os, pathlib, subprocess
+          run = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'windows-run.json').read_text())
+          assert run['status'] == 'completed' and run['conclusion'] == 'success', 'Windows verification must pass before publication'
+          assert run['head_sha'] == os.environ['VERIFIED_SOURCE'], 'Unexpected tested source'
+          assert run['path'] == '.github/workflows/windows.yml' and run['event'] == 'push'
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '-z', os.environ['VERIFIED_SOURCE'], 'HEAD']).decode().split('\0')
+          forbidden = [p for p in changed if p and not p.startswith(('docs/', 'website/')) and p != '.github/workflows/release.yml']
+          assert not forbidden, 'Application source changed after Windows verification: ' + repr(forbidden)
+          print('Windows verification passed; installed application source matches the release.')
+          PYCODE
   release:
     needs: [verify_release, verify_windows]
     runs-on: ubuntu-latest
@@ -29,6 +84,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: windows-installer
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.VERIFIED_WINDOWS_RUN }}
           path: artifacts/windows
       - name: Include Windows installer and checksum
         run: |
@@ -39,8 +96,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v0.1.5 >/dev/null 2>&1; then
-            echo 'v0.1.5 already exists; published installers must not be overwritten.'
+          if gh release view v0.1.6 >/dev/null 2>&1; then
+            echo 'v0.1.6 already exists; published installers must not be overwritten.'
             exit 1
           fi
-          gh release create v0.1.5 artifacts/release/DeeL-Pyess-v0.1.5.zip artifacts/release/DeeL-Pyess-Setup-v0.1.5-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.5 — Clear Tiny-SD selection and quick image creation' --prerelease --notes-file docs/release-notes.md
+          gh release create v0.1.6 artifacts/release/DeeL-Pyess-v0.1.6.zip artifacts/release/DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.6 — CPU image and video personalization with gpt-oss agent learning' --prerelease --notes-file docs/release-notes.md

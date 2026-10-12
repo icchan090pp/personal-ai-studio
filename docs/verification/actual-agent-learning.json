@@ -1,0 +1,46 @@
+{
+  "project_id": "e7b4dac1aa9542de974f64eda1a7b386",
+  "version_id": "8b31b77be8c040c39a9f35f0beef314e",
+  "model": "gpt-oss:20b",
+  "checks": [
+    "actual gpt-oss compares baseline response and saved instruction/knowledge/examples",
+    "evaluation creates new immutable version; next actual inference uses it",
+    "actual browser PC/mobile, version persistence, no JS errors or overflow"
+  ],
+  "before_answer": "申し訳ありませんが、お客様がどの作品についてお尋ねなのか、具体的な情報がわからないため、お答えできません。  \nお手数ですが、以下のような情報を教えていただけますか？\n\n1. **作品のタイトル**（あるいは作りたくて決めている名前）  \n2. **作品のジャンルや形式**（絵画・写真・文章・音楽・映像など）  \n3. **現在のテーマやアイデア**（例えば「孤独」「希望」「都市の光」など）  \n4. **作品を制作している背景や目的**（個人的な表現、展示会用、あるテーマに関する研究など）\n\nこれらの情報をいただければ、作品名のアイデアやテーマの整理・提案を具体的にサポートできます。どうぞよろしくお願いします。",
+  "answer": "あなたの作品名は「青い庭」で、テーマは「水彩の青い花と柔らかな光」です。",
+  "run_id": "55854d47864840d69fa07e4a828ab3d7",
+  "continued_version_id": "843eedbc8cad469a859dcc2ec89c3a16",
+  "continued_answer": "作品名は「青い庭」。  \nテーマは「水彩の青い花と柔らかな光」です。",
+  "elapsed_seconds": 84.19,
+  "peak_runner_rss_gb": 13.124,
+  "ollama_models": {
+    "models": [
+      {
+        "name": "gpt-oss:20b",
+        "model": "gpt-oss:20b",
+        "modified_at": "2026-10-12T00:42:53.300179697Z",
+        "size": 13793441566,
+        "digest": "401842c635331b61bf63fecda0899efea2d0e3253642198bdb15dff0ebfa3350",
+        "details": {
+          "parent_model": "dhiltgen/gpt-oss:20b-llamacpp",
+          "format": "gguf",
+          "family": "gpt-oss",
+          "families": [
+            "gpt-oss"
+          ],
+          "parameter_size": "20.9B",
+          "quantization_level": "MXFP4",
+          "context_length": 131072,
+          "embedding_length": 2880,
+          "runner": "llamacpp"
+        },
+        "capabilities": [
+          "completion",
+          "tools",
+          "thinking"
+        ]
+      }
+    ]
+  }
+}

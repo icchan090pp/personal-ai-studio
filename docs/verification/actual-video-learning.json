@@ -1,0 +1,79 @@
+{
+  "model": "AnimateDiff + DreamShaper 8",
+  "runtime": "CPU",
+  "checks": [
+    "train temporal and spatial LoRA finite, nonzero, downloadable",
+    "continue temporal and spatial LoRA finite, nonzero, downloadable",
+    "trained version generates H.264 video with AAC Japanese speech, 720p, narration preserved",
+    "two training versions retained",
+    "decoded AAC has finite non-silent samples; separated video frames differ"
+  ],
+  "jobs": [
+    {
+      "id": "75ac20b79cf44251828f3f16dc75ec55",
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "motion_model": "guoyww/animatediff-motion-adapter-v1-5-2",
+        "adapter_id": null,
+        "seed": 42,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "frames": 16,
+        "fps": 8,
+        "audio_model": null,
+        "elapsed_seconds": 304.06
+      }
+    },
+    {
+      "id": "223a8a5f94e8451a9d70be362981b304",
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "motion_model": "guoyww/animatediff-motion-adapter-v1-5-2",
+        "adapter_id": "75ac20b79cf44251828f3f16dc75ec55",
+        "seed": 42,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "frames": 16,
+        "fps": 8,
+        "audio_model": null,
+        "elapsed_seconds": 321.01
+      }
+    },
+    {
+      "id": "2aab49dbd3f945bd823a3dc9a82b18a2",
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "motion_model": "guoyww/animatediff-motion-adapter-v1-5-2",
+        "adapter_id": "223a8a5f94e8451a9d70be362981b304",
+        "seed": 42,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "frames": 16,
+        "fps": 8,
+        "audio_model": "kokoro",
+        "elapsed_seconds": 1476.4
+      }
+    }
+  ],
+  "peak_worker_rss_gb": 10.561,
+  "project_id": "975f0321806849bc8f2e30e48f261893",
+  "output": {
+    "job_id": "2aab49dbd3f945bd823a3dc9a82b18a2",
+    "sha256": "4290413e2e70bb4fdb11d28327f45aa1886aaa064088776fcece239e2ab2c681",
+    "size": 4837464,
+    "duration": 4.3,
+    "frames": 34,
+    "decoded_audio_rms": 0.06425,
+    "decoded_audio_samples": 103424,
+    "frame_mean_absolute_difference": 7.3095
+  }
+}

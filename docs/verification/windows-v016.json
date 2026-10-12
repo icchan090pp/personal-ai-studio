@@ -1,0 +1,142 @@
+{
+  "conclusion": "success",
+  "headSha": "c6cc2f62d48ddee5a170ce73978778cec7370ce0",
+  "jobs": [
+    {
+      "completedAt": "2026-10-12T01:42:53Z",
+      "conclusion": "success",
+      "databaseId": 114626718774,
+      "name": "windows",
+      "startedAt": "2026-10-12T01:29:04Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/setup-python@v5",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Install application and build tools",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Build native Windows installer",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Install, launch and uninstall the actual EXE",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Collect Windows diagnostics",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/upload-artifact@v4",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/setup-python@v5",
+          "number": 15,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 16,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 17,
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/icchan090pp/personal-ai-studio/actions/runs/38192052646/job/114626718774"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/icchan090pp/personal-ai-studio/actions/runs/38192052646",
+  "actual_cpu_learning": [
+    {
+      "id": "587af7da2f0e45a089d5aa4922182a1e",
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": null,
+      "comparison": false,
+      "seed": 42,
+      "prompt": null,
+      "inference_steps": null,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 61.69
+    },
+    {
+      "id": "f50c0c1df5ec42bf92052c3bc5b0ef11",
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": "587af7da2f0e45a089d5aa4922182a1e",
+      "comparison": false,
+      "seed": 42,
+      "prompt": null,
+      "inference_steps": null,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 52.14
+    },
+    {
+      "id": "be00fa6588ef4c77b70e0b2e67a1916e",
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": "f50c0c1df5ec42bf92052c3bc5b0ef11",
+      "comparison": true,
+      "seed": 42,
+      "prompt": "a blue circle in the style of circleart",
+      "inference_steps": 20,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 80.58
+    }
+  ],
+  "checks": [
+    "fresh EXE install and WebView2 UI",
+    "v0.1.5 upgrade with identical database hash",
+    "isolated CPU/DirectML setup",
+    "real Tiny-SD CPU training, continuation and before/after generation",
+    "five starts/uploads/exits, no leaked server, uninstall retains user data"
+  ]
+}
