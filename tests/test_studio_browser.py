@@ -127,6 +127,9 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#video-training-help")).to_contain_text("CPU")
             expect(page.locator("#steps")).to_have_value("10")
             expect(page.locator("#media-upload-controls")).to_have_attribute("open", "")
+            with page.expect_file_chooser() as training_chooser:
+                page.locator("#add-training-image").click()
+            assert training_chooser.value.element.get_attribute("id") == "media-upload"
             page.locator("#learning-preset").select_option("vtuber")
             expect(page.locator("#training-instruction")).to_have_value(
                 "anime avatar, clean line art, cel shading, expressive face, character design, simple background"
@@ -149,6 +152,9 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             page.locator('[data-workspace="image"]').click()
             expect(page.locator("#training-base option")).to_have_count(5)
             expect(page.locator("#training-base")).to_have_value("tiny")
+            with page.expect_file_chooser() as training_chooser:
+                page.locator("#add-training-image").click()
+            assert training_chooser.value.element.get_attribute("id") == "upload"
             page.locator("#learning-preset").select_option("anime")
             expect(page.locator("#training-base")).to_have_value("illustration")
             expect(page.locator("#training-instruction")).to_have_value(
