@@ -45,10 +45,13 @@ def main():
                 "document.querySelector('#projects').getAttribute('aria-label') === '作業プロジェクトを選択'"
             )
             assert window.evaluate_js(
-                "document.querySelector('#training-base').options.length === 4 && document.querySelector('#training-base').value === 'tiny'"
+                "document.querySelector('#training-base').options.length === 5 && document.querySelector('#training-base').value === 'tiny'"
             )
             assert window.evaluate_js(
                 "document.querySelector('#training-base-help').textContent.includes('CPU')"
+            )
+            assert window.evaluate_js(
+                "Boolean(document.querySelector('#finish-button') && document.querySelector('#add-generation-image') && document.querySelector('#add-training-image'))"
             )
             window.evaluate_js("document.querySelector('[data-workspace=video]').click()")
             assert window.evaluate_js(
@@ -82,8 +85,9 @@ def main():
                             "real_app_dom",
                             "generation_navigation",
                             "tiny_sd_quick_selection",
-                            "four_training_bases_and_cpu_guidance",
+                            "five_training_configurations_and_cpu_guidance",
                             "video_training_and_agent_sections",
+                            "image_finishing_and_prompt_attachments",
                             "update_dialog",
                             "hardware_dialog",
                         ],

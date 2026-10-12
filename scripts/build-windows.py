@@ -40,7 +40,7 @@ subprocess.run(
     check=True,
 )
 shutil.copytree(sys.base_prefix, runtime, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-for directory in ("studio",):
+for directory in ("studio", "docs/licenses"):
     shutil.copytree(
         root / directory, bundle / directory, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
     )

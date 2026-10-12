@@ -30,6 +30,10 @@ def test_two_model_catalog(studio, monkeypatch):
 
     with monkeypatch.context() as patch:
         check_research(client, _root, patch)
+    from tests.check_finishing import check_finishing
+
+    with monkeypatch.context() as patch:
+        check_finishing(_root, patch)
     from tests.check_image_learning import check_image_learning
 
     check_image_learning(client, _root, monkeypatch)

@@ -3,6 +3,7 @@
 import argparse
 import io
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -26,7 +27,22 @@ def main():
     assert not torch.cuda.is_available(), "This smoke proves the CUDA-free path"
     root = args.data.resolve()
     records = []
-    with TestClient(installed.create_app(root)) as client:
+    with TestClient(installed.create_app(root), client=("127.0.0.1", 50000)) as client:
+        from studio.google_images import load_key
+
+        assert (
+            client.put(
+                "/api/system/google-images", json={"api_key": "test-windows-dpapi"}
+            ).status_code
+            == 200
+        )
+        assert load_key(root) == "test-windows-dpapi"
+        if os.name == "nt":
+            assert b"test-windows-dpapi" not in (root / "google-api-key.bin").read_bytes()
+        assert (
+            client.put("/api/system/google-images", json={"api_key": ""}).json()["configured"]
+            is False
+        )
         pid = client.post(
             "/api/projects", json={"name": "CPU育成試験", "trigger": "circleart"}
         ).json()["id"]

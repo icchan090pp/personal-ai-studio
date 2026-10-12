@@ -227,7 +227,9 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                             [
                                 sys.executable,
                                 "-m",
-                                "studio.compat"
+                                "studio.finishing"
+                                if job["kind"] == "finish"
+                                else "studio.compat"
                                 if config.get("public_model") == "tiny"
                                 else "studio.laptop_video"
                                 if config.get("video_model") == "animatediff"
@@ -269,6 +271,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                         "audio_train": "adapter.zip",
                         "voice_train": "adapter.zip",
                         "image": "output.png",
+                        "finish": "output.png",
                         "video": "output.mp4",
                         "audio": "output.wav",
                     }
@@ -1039,6 +1042,12 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         return {"excluded": body.excluded, "applies_to": "next_training"}
 
     def enqueue(project_id, kind, config):
+        if (
+            kind == "finish"
+            and config.get("finish_provider") == "realesrgan"
+            and not inspect_system()["cpu_ready"]
+        ):
+            raise HTTPException(503, "『PC環境・AI機能』からCPU用のAI機能を導入してください")
         cpu_voice = kind == "voice_train" or (
             kind == "audio" and config.get("audio_model") == "kokoro"
         )
@@ -1075,7 +1084,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                     422,
                     f"{training_base['name']}の目安はRAM {training_base['ram_gb']}GB以上です。このPCは約{ram}GBです。Tiny-SDを選ぶか、メモリの多いPCをご利用ください。",
                 )
-        if not cpu_voice and not compatible_image and not gpu_available():
+        if kind != "finish" and not cpu_voice and not compatible_image and not gpu_available():
             raise HTTPException(
                 503,
                 "この機能にはNVIDIA CUDA GPUが必要です。画像の学習では『Tiny-SD / 軽量・CPU学習』または『Small-SD / CPU学習』を選んでください。『PC環境・AI機能』で導入・診断できます。",
@@ -1392,7 +1401,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 )
         if body.kind == "video" and not body.public_model and body.video_model != "animatediff":
             source = query(
-                "SELECT * FROM jobs WHERE id=? AND project_id=? AND kind='image' "
+                "SELECT * FROM jobs WHERE id=? AND project_id=? AND kind IN ('image','finish') "
                 "AND status='completed'",
                 (body.source_id, project_id),
                 True,
@@ -1561,6 +1570,13 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             elif row["kind"] == "train":
                 row["model_name"] = config.get("base_model", "SD 1.5")
             row["voice_applied"] = bool(config.get("voice_job_id"))
+            row["finish_provider"] = config.get("finish_provider")
+            if row["kind"] == "finish":
+                row["model_name"] = (
+                    "Google / 画像編集"
+                    if config["finish_provider"] == "google"
+                    else "Real-ESRGAN / 高精細化"
+                )
             execution = root / "jobs" / row["id"] / "execution.json"
             if selected == "tiny" and row["status"] == "completed" and execution.is_file():
                 details = json.loads(execution.read_text(encoding="utf-8"))
@@ -1584,7 +1600,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
         if (
             not job
             or job["status"] != "completed"
-            or not json.loads(job["config"]).get("compare_before")
+            or (job["kind"] != "finish" and not json.loads(job["config"]).get("compare_before"))
         ):
             raise HTTPException(404, "比較画像はまだありません")
         path = root / "jobs" / job_id / "before.png"
@@ -1603,6 +1619,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             "audio_train": "adapter.zip",
             "voice_train": "adapter.zip",
             "image": "output.png",
+            "finish": "output.png",
             "video": "output.mp4",
             "audio": "output.wav",
         }
@@ -1612,6 +1629,11 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     from studio.agent_learning import register_agent_routes
 
     register_agent_routes(app, db_path, query, project_or_404, model_guard)
+    from studio.finishing import register_routes
+
+    register_routes(
+        app, root, query, project_or_404, enqueue, process_guard, active_processes, stop_process
+    )
     return app
 
 

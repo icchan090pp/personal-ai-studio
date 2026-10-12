@@ -12,3 +12,5 @@
 .voice-screen{margin:35px 0;color:#d9e8ff}.voice-screen img{display:block;width:100%;height:auto;border:1px solid #294768;border-radius:12px}.voice-screen>p{max-width:900px;color:#9bb1cd}
 
 .related-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:24px 0}.related-steps article{background:#0c1625;border:1px solid #26405f;border-radius:14px;padding:24px}.related-steps article>span{color:#6baaff}.related-steps h3{font-size:16px}.related-steps p,#related-learning>.hint{color:#98acc8;font-size:12px;line-height:1.9}@media(max-width:700px){.related-steps{grid-template-columns:1fr}}
+
+.feature-screens{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:36px 0}.feature-screens figure{margin:0;min-width:0}.feature-screens figcaption{display:grid;gap:8px;margin-bottom:16px;line-height:1.6}.feature-screens figcaption span{font-size:13px;color:#a8c2e6}.feature-screens img{display:block;width:100%;height:auto;border-radius:12px;background:#07101c;border:1px solid #25364e}@media(max-width:760px){.feature-screens{grid-template-columns:1fr;gap:32px}.feature-screens figure{width:100%;max-width:400px;margin:auto}}
