@@ -241,17 +241,21 @@ def execute(root, job_id):
     dtype = torch.float32 if job["kind"] == "train" else torch.float16
     pipe = load_pipeline(base, dtype)
     if job["kind"] == "image":
+        from studio.reference_images import image_arguments, image_pipeline
+
+        pipe = image_pipeline(pipe, config)
         pipe.load_lora_weights(str(root / "jobs" / trained["id"] / "adapter"))
         pipe.enable_model_cpu_offload()
+        generator = torch.Generator(device="cpu").manual_seed(config["seed"])
+        arguments = image_arguments(pipe, root, config, 512, generator)
         result = pipe(
             prompt=config["prompt"],
             negative_prompt=config["negative_prompt"],
-            height=512,
-            width=512,
+            **arguments,
             num_inference_steps=config["inference_steps"],
             guidance_scale=config["guidance_scale"],
             callback_on_step_end=callback,
-            generator=torch.Generator(device="cpu").manual_seed(config["seed"]),
+            generator=generator,
         )
         if result.nsfw_content_detected and any(result.nsfw_content_detected):
             raise RuntimeError("画像の安全性チェックにより出力されませんでした")

@@ -3,7 +3,6 @@
 import argparse
 import io
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -28,21 +27,6 @@ def main():
     root = args.data.resolve()
     records = []
     with TestClient(installed.create_app(root), client=("127.0.0.1", 50000)) as client:
-        from studio.google_images import load_key
-
-        assert (
-            client.put(
-                "/api/system/google-images", json={"api_key": "test-windows-dpapi"}
-            ).status_code
-            == 200
-        )
-        assert load_key(root) == "test-windows-dpapi"
-        if os.name == "nt":
-            assert b"test-windows-dpapi" not in (root / "google-api-key.bin").read_bytes()
-        assert (
-            client.put("/api/system/google-images", json={"api_key": ""}).json()["configured"]
-            is False
-        )
         pid = client.post(
             "/api/projects", json={"name": "CPU育成試験", "trigger": "circleart"}
         ).json()["id"]
@@ -94,11 +78,19 @@ def main():
         after = load_file(root / "jobs" / continued / "adapter/pytorch_lora_weights.safetensors")
         assert state.keys() == after.keys()
         assert any(not torch.equal(state[k], after[k]) for k in state)
+        reference = client.post(
+            f"/api/projects/{pid}/finish/attachments",
+            files={"file": ("reference.png", files[0][1][1], "image/png")},
+        )
+        assert reference.status_code == 201
+        reference_id = reference.json()["id"]
         generated = run(
             "generate",
             {
                 "trained_job_id": continued,
                 "compare_before": True,
+                "reference_id": reference_id,
+                "reference_strength": 0.55,
                 "prompt": "a blue circle in the style of circleart",
                 "resolution": "native",
             },
@@ -110,6 +102,7 @@ def main():
         before = client.get(f"/api/jobs/{generated}/before?download=true")
         assert before.status_code == 200 and before.content != result.content
         assert client.get(f"/api/projects/{pid}/jobs").json()[0]["has_comparison"]
+        assert records[-1]["reference_id"] == reference_id
         assert client.get(f"/api/jobs/{continued}/result?download=true").content.startswith(b"PK")
     # Reopen the database as an upgrade/restart would, and retain both learned versions.
     with TestClient(installed.create_app(root, run_workers=False)) as client:

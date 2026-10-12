@@ -9,12 +9,10 @@ import uuid
 from pathlib import Path
 from typing import Literal
 
-from fastapi import File, HTTPException, Request, UploadFile
+from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps
-from pydantic import BaseModel, Field, SecretStr
-
-from studio import google_images
+from pydantic import BaseModel
 
 
 def register_routes(
@@ -37,7 +35,7 @@ def register_routes(
         folder = root / "projects" / project_id / "references"
         folder.mkdir(parents=True, exist_ok=True)
         if len(list(folder.glob("*.png"))) >= 100:
-            raise HTTPException(422, "編集用の参照画像は100件までです")
+            raise HTTPException(422, "生成・仕上げ用の参照画像は100件までです")
         iid = uuid.uuid4().hex
         clean.save(folder / (iid + ".png"))
         return {
@@ -60,44 +58,11 @@ def register_routes(
     def attachment_file(project_id: str, iid: str):
         return FileResponse(attachment_path(project_id, iid))
 
-    class KeyInput(BaseModel):
-        api_key: SecretStr
-
-    @app.get("/api/system/google-images")
-    def settings():
-        return {
-            "configured": (root / "google-api-key.bin").is_file(),
-            "models": google_images.MODELS,
-            "key_protection": "Windows DPAPI"
-            if __import__("os").name == "nt"
-            else "所有者のみ読めるローカルファイル",
-        }
-
-    @app.put("/api/system/google-images")
-    def key(body: KeyInput, request: Request):
-        if not request.client or request.client.host not in {"127.0.0.1", "::1"}:
-            raise HTTPException(403, "APIキーはこのPCの画面から設定してください")
-        value = body.api_key.get_secret_value().strip()
-        if len(value) > 256 or any(c.isspace() for c in value):
-            raise HTTPException(422, "APIキーの形式を確認してください")
-        try:
-            google_images.save_key(root, value)
-        except OSError:
-            raise HTTPException(
-                503, "APIキーを保存できませんでした。PCの保存先を確認してください"
-            ) from None
-        return settings()
-
     class FinishInput(BaseModel):
-        provider: Literal["google", "realesrgan"]
+        provider: Literal["realesrgan"] = "realesrgan"
         source_job_id: str | None = None
         source_image_id: str | None = None
         source_attachment_id: str | None = None
-        prompt: str = Field(default="", max_length=2000)
-        google_model: Literal["gemini-nano-banana-2.1", "gemini-3-pro-image"] = (
-            "gemini-nano-banana-2.1"
-        )
-        resolution: Literal["1K", "2K", "4K"] = "1K"
         enhancement_model: Literal["anime", "photo"] = "anime"
         scale: Literal[2, 4] = 2
         denoise: bool = False
@@ -137,15 +102,6 @@ def register_routes(
             path = attachment_path(project_id, body.source_attachment_id).relative_to(root)
         if not (root / path).is_file():
             raise HTTPException(404, "元の作品ファイルが見つかりません")
-        if body.provider == "google":
-            if not body.prompt.strip():
-                raise HTTPException(422, "Googleに送る編集指示を入力してください")
-            try:
-                configured = bool(google_images.load_key(root))
-            except OSError:
-                configured = False
-            if not configured:
-                raise HTTPException(422, "Google APIキーを『仕上げ』の設定から登録してください")
         return enqueue(
             project_id,
             "finish",
@@ -172,7 +128,7 @@ def register_routes(
                     stop_process(process)
         return {
             "stopped": len(rows),
-            "message": "PC側の仕上げ処理を停止しました。送信済みのGoogle処理・課金は取り消せません。",
+            "message": "仕上げ処理を停止しました。元の画像は保持しています。",
         }
 
 
@@ -208,18 +164,9 @@ def execute(root, job_id):
             )
 
     progress(5)
-    if config["finish_provider"] == "google":
-        output, details = google_images.edit(
-            source,
-            config["prompt"],
-            config["google_model"],
-            config["resolution"],
-            google_images.load_key(root),
-        )
-    else:
-        output, details = enhance(
-            source, root, config["enhancement_model"], config["scale"], config["denoise"], progress
-        )
+    output, details = enhance(
+        source, root, config["enhancement_model"], config["scale"], config["denoise"], progress
+    )
     output.save(folder / "output.png")
     details.update(
         provider=config["finish_provider"],
@@ -242,7 +189,6 @@ def main():
     try:
         execute(args.data, args.job)
     except Exception as error:
-        # Provider responses, request headers and API keys never enter the worker log.
         message = (
             str(error)
             if isinstance(error, ValueError)

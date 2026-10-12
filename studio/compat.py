@@ -35,7 +35,9 @@ def generate(config, destination, progress, model=None, device="cpu", device_ind
     from studio.exports import save_image
 
     torch.set_num_threads(min(4, os.cpu_count() or 1))
-    pipe = pipeline(model)
+    from studio.reference_images import image_arguments, image_pipeline
+
+    pipe = image_pipeline(pipeline(model), config)
     if device == "directml":
         import torch_directml
 
@@ -48,14 +50,15 @@ def generate(config, destination, progress, model=None, device="cpu", device_ind
         progress(min(99, (step + 1) * 100 // config["inference_steps"]))
         return values
 
+    generator = torch.Generator(device="cpu").manual_seed(config["seed"])
+    arguments = image_arguments(pipe, destination.parents[2], config, size, generator)
     result = pipe(
         prompt=config["prompt"],
         negative_prompt=config.get("negative_prompt", ""),
-        height=size,
-        width=size,
+        **arguments,
         num_inference_steps=config["inference_steps"],
         guidance_scale=7.5,
-        generator=torch.Generator(device="cpu").manual_seed(config["seed"]),
+        generator=generator,
         callback_on_step_end=callback,
     )
     if result.nsfw_content_detected and any(result.nsfw_content_detected):
@@ -166,6 +169,8 @@ def execute(root, job_id, directml_model=None, device_index=0):
             {
                 "backend": backend,
                 "model": MODEL_ID,
+                "reference_id": config.get("reference_id"),
+                "reference_strength": config.get("reference_strength"),
                 "native_resolution": [256, 256],
                 "fallback_reason": config.get("fallback_reason"),
             },

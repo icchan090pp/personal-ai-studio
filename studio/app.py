@@ -65,6 +65,8 @@ class TrainingInput(BaseModel):
 
 
 class GenerationInput(BaseModel):
+    reference_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    reference_strength: float = Field(default=0.55, ge=0.1, le=0.95)
     video_model: Literal["animatediff", "cogvideo"] | None = None
     compare_before: bool = False
     trained_job_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{1,80}$")
@@ -1309,6 +1311,16 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
     @app.post("/api/projects/{project_id}/generate", status_code=202)
     def generate(project_id: str, body: GenerationInput):
         project_or_404(project_id)
+        reference_path = None
+        if body.reference_id:
+            if body.kind != "image":
+                raise HTTPException(422, "参考画像は画像生成で使用してください")
+            reference_path = (
+                Path("projects") / project_id / "references" / (body.reference_id + ".png")
+            )
+            if not (root / reference_path).is_file():
+                raise HTTPException(404, "このプロジェクトの参考画像を追加してください")
+
         if body.video_model and (body.kind != "video" or body.public_model):
             raise HTTPException(422, "動画の基盤モデルは独自モデルの動画生成で選択してください")
         if body.video_model == "animatediff" and body.with_audio and body.audio_model != "kokoro":
@@ -1410,6 +1422,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
                 raise HTTPException(422, "動画の元になる生成済み画像を選んでください")
         project = project_or_404(project_id)
         config = body.model_dump()
+        config["reference_path"] = str(reference_path) if reference_path else None
         if trained and (body.kind == "image" or body.video_model):
             previous = json.loads(trained["config"])
             config.update(
@@ -1572,11 +1585,7 @@ def create_app(data_dir: Path | None = None, run_workers: bool = True):
             row["voice_applied"] = bool(config.get("voice_job_id"))
             row["finish_provider"] = config.get("finish_provider")
             if row["kind"] == "finish":
-                row["model_name"] = (
-                    "Google / 画像編集"
-                    if config["finish_provider"] == "google"
-                    else "Real-ESRGAN / 高精細化"
-                )
+                row["model_name"] = "Real-ESRGAN / 高精細化"
             execution = root / "jobs" / row["id"] / "execution.json"
             if selected == "tiny" and row["status"] == "completed" and execution.is_file():
                 details = json.loads(execution.read_text(encoding="utf-8"))

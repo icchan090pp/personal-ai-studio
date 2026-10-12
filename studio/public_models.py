@@ -69,6 +69,9 @@ def generate_public(config, folder, callback):
         revision=model["revision"],
         torch_dtype=torch.bfloat16 if model["kind"] == "video" else torch.float16,
     )
+    from studio.reference_images import image_arguments, image_pipeline
+
+    pipe = image_pipeline(pipe, config)
     pipe.enable_model_cpu_offload()
     if hasattr(pipe.vae, "enable_tiling"):
         pipe.vae.enable_tiling()
@@ -90,7 +93,7 @@ def generate_public(config, folder, callback):
         frames = pipe(**kwargs).frames[0]
         save_video(frames, folder / "output.mp4", config["resolution"], fps=8)
     else:
-        kwargs.update(height=1024, width=1024)
+        kwargs.update(image_arguments(pipe, folder.parents[1], config, 1024, kwargs["generator"]))
         if config["public_model"] != "pixart":
             kwargs["callback_on_step_end"] = callback
         image = pipe(**kwargs).images[0]

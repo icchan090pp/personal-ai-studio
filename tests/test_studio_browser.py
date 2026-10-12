@@ -303,21 +303,32 @@ def test_actual_studio_upload_edit_and_navigation(tmp_path, viewport):
             expect(page.locator("#image-count")).to_have_text("1 / 100枚")
             page.get_by_role("button", name="作品をつくる").click()
             expect(page.locator("#generation-form")).to_be_visible()
+            page.locator("#public-model").select_option("tiny")
             with page.expect_file_chooser() as chooser:
                 page.locator("#add-generation-image").click()
             chooser.value.set_files(str(image))
+            expect(page.locator("#generation-reference-preview img")).to_be_visible()
+            page.locator("#reference-strength").fill("0.35")
+            page.locator("#prompt").fill("blue sky")
+            page.route(
+                "**/api/projects/*/generate",
+                lambda route: route.fulfill(status=202, json={"id": "reference-contract"}),
+            )
+            with page.expect_request("**/api/projects/*/generate") as requested:
+                page.locator("#generate-button").click()
+            assert len(requested.value.post_data_json["reference_id"]) == 32
+            assert requested.value.post_data_json["reference_strength"] == 0.35
+            assert requested.value.post_data_json["public_model"] == "tiny"
+            page.unroute("**/api/projects/*/generate")
+            page.screenshot(path=str(screenshots / f"reference-image-{viewport['width']}.png"))
+            page.locator("#remove-generation-image").click()
+            expect(page.locator("#generation-reference")).to_be_hidden()
+            page.locator("#finish-button").click()
+            with page.expect_file_chooser() as chooser:
+                page.locator("#finish-add-image").click()
+            chooser.value.set_files(str(image))
             expect(page.locator("#finish-source-preview img")).to_be_visible()
-            expect(page.locator("#finish-provider")).to_have_value("google")
-            page.locator("#google-key-settings summary").click()
-            page.locator("#google-api-key").fill("test-browser-key")
-            page.locator("#save-google-key").click()
-            expect(page.locator("#google-key-status")).to_contain_text("登録済み")
-            expect(page.locator("#google-api-key")).to_have_value("")
-            page.locator("#finish-prompt").fill("構図を保ち、背景を青くしてください")
-            page.screenshot(path=str(screenshots / f"google-finish-{viewport['width']}.png"))
-            page.locator("#delete-google-key").click()
-            expect(page.locator("#google-key-status")).to_contain_text("未登録")
-            page.locator("#finish-provider").select_option("realesrgan")
+            expect(page.locator("#google-api-key")).to_have_count(0)
             with page.expect_response("**/finish") as finish_reply:
                 page.locator("#start-finish").click()
             assert finish_reply.value.status == 202

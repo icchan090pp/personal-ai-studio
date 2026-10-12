@@ -105,6 +105,9 @@ def execute(root, job_id):
                 resolution=resolution,
             )
     else:
+        from studio.reference_images import image_arguments, image_pipeline
+
+        pipe = image_pipeline(pipe, config)
         pipe.to(device)
 
         stages = (
@@ -129,14 +132,15 @@ def execute(root, job_id):
                 )
                 return values
 
+            generator = torch.Generator(device="cpu").manual_seed(config["seed"])
+            arguments = image_arguments(pipe, root, config, resolution, generator)
             result = pipe(
                 prompt=config["prompt"],
                 negative_prompt=config["negative_prompt"],
-                height=resolution,
-                width=resolution,
+                **arguments,
                 num_inference_steps=config["inference_steps"],
                 guidance_scale=config["guidance_scale"],
-                generator=torch.Generator(device="cpu").manual_seed(config["seed"]),
+                generator=generator,
                 callback_on_step_end=callback,
             )
             if result.nsfw_content_detected and any(result.nsfw_content_detected):
@@ -150,6 +154,8 @@ def execute(root, job_id):
                 "revision": config["base_revision"],
                 "adapter_id": adapter_id,
                 "comparison": bool(config.get("compare_before")),
+                "reference_id": config.get("reference_id"),
+                "reference_strength": config.get("reference_strength"),
                 "seed": config["seed"],
                 "prompt": config.get("prompt"),
                 "inference_steps": config.get("inference_steps"),
