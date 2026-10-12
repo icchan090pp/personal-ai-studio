@@ -1,0 +1,64 @@
+{
+  "project": "78435870438d49e0a8d49d336c0478d0",
+  "records": [
+    {
+      "job": "1f4cf8e4a9e04cd6844498c64d304397",
+      "seconds": 5.19,
+      "peak_rss_gib": 0.338,
+      "execution": {
+        "backend": "cpu",
+        "model": "Real-ESRGAN / アニメ・イラスト",
+        "weights_sha256": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da",
+        "source_size": [
+          256,
+          144
+        ],
+        "working_size": [
+          256,
+          144
+        ],
+        "output_size": [
+          512,
+          288
+        ],
+        "scale": 2,
+        "denoise": false,
+        "provider": "realesrgan",
+        "source_job_id": null,
+        "source_image_id": null,
+        "source_kind": "image",
+        "elapsed_seconds": 4.13
+      }
+    },
+    {
+      "job": "d5ec86652f0643a9b141897cb29d4a54",
+      "seconds": 13.62,
+      "peak_rss_gib": 0.436,
+      "execution": {
+        "backend": "cpu",
+        "model": "Real-ESRGAN / 写真・汎用",
+        "weights_sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+        "source_size": [
+          256,
+          144
+        ],
+        "working_size": [
+          256,
+          144
+        ],
+        "output_size": [
+          1024,
+          576
+        ],
+        "scale": 4,
+        "denoise": true,
+        "provider": "realesrgan",
+        "source_job_id": null,
+        "source_image_id": null,
+        "source_kind": "image",
+        "elapsed_seconds": 12.31
+      }
+    }
+  ],
+  "source_preserved": true
+}

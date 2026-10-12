@@ -1,0 +1,142 @@
+{
+  "project": "7c4a10bd099a4ae8a314685afa87b45f",
+  "data_root": "/workspace/personal-ai-studio/artifacts/learning-related",
+  "records": [
+    {
+      "job": "3949346ec1004f24a82b440df78aeb77",
+      "kind": "train",
+      "seconds": 76.19,
+      "max_rss_gib": 2.879,
+      "execution": {
+        "backend": "cpu",
+        "model": "segmind/tiny-sd",
+        "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+        "adapter_id": null,
+        "comparison": false,
+        "seed": 42,
+        "prompt": null,
+        "inference_steps": null,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "elapsed_seconds": 73.23
+      },
+      "related_report": {
+        "stage": "ready",
+        "added": 2,
+        "queries": [
+          "anime girl",
+          "anime cartoon",
+          "anime pixel"
+        ],
+        "selected": [
+          {
+            "id": "0ec4b0310c1c4094bc0219d355fc0530",
+            "page": "https://commons.wikimedia.org/wiki/File:Anime_girl_portrait.jpg",
+            "license": "Public domain",
+            "similarity": 0.7699
+          },
+          {
+            "id": "454dcc2133c14f499ab3f1d228bdd9f2",
+            "page": "https://commons.wikimedia.org/wiki/File:Loligirl.jpg",
+            "license": "CC BY 2.5",
+            "similarity": 0.7528
+          }
+        ],
+        "warnings": [],
+        "anchors": [
+          "90e62cbb70aa43cf8e7a147bb8a797c5",
+          "8e6bcf41da2844f4ad4013fe30fc2d49",
+          "513411f427064cd3a8b24149d416759c"
+        ],
+        "inspected": 30,
+        "rejected": 28
+      }
+    },
+    {
+      "job": "45f4307016e64b5887c98b2c1258c2d2",
+      "kind": "train",
+      "seconds": 61.6,
+      "max_rss_gib": 2.81,
+      "execution": {
+        "backend": "cpu",
+        "model": "segmind/tiny-sd",
+        "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+        "adapter_id": "3949346ec1004f24a82b440df78aeb77",
+        "comparison": false,
+        "seed": 42,
+        "prompt": null,
+        "inference_steps": null,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "elapsed_seconds": 59.18
+      }
+    },
+    {
+      "job": "5488b231a4534e42be83d531fbe210b7",
+      "kind": "generate",
+      "seconds": 53.02,
+      "max_rss_gib": 2.704,
+      "execution": {
+        "backend": "cpu",
+        "model": "segmind/tiny-sd",
+        "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+        "adapter_id": "45f4307016e64b5887c98b2c1258c2d2",
+        "comparison": true,
+        "seed": 42,
+        "prompt": "myanime, anime illustration, portrait of an adult woman with blue hair, cel shading, clean line art",
+        "inference_steps": 20,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "elapsed_seconds": 50.8
+      }
+    },
+    {
+      "job": "b700aa2fb830459abda887df5f260392",
+      "kind": "train",
+      "seconds": 53.93,
+      "max_rss_gib": 4.49,
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "revision": "a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917",
+        "adapter_id": null,
+        "comparison": false,
+        "seed": 42,
+        "prompt": null,
+        "inference_steps": null,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "elapsed_seconds": 51.35
+      }
+    },
+    {
+      "job": "e6a6196e4fcb412e83f56619670664bd",
+      "kind": "generate",
+      "seconds": 84.22,
+      "max_rss_gib": 5.514,
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "revision": "a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917",
+        "adapter_id": "b700aa2fb830459abda887df5f260392",
+        "comparison": true,
+        "seed": 42,
+        "prompt": "myanime, anime illustration, portrait of an adult woman with blue hair, cel shading, clean line art",
+        "inference_steps": 20,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "elapsed_seconds": 82.09
+      }
+    }
+  ]
+}

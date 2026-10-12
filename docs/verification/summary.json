@@ -1,5 +1,5 @@
 {
-  "version": "v0.1.6",
+  "version": "v0.1.7",
   "unique_cases": 100,
   "consecutive_runs": 5,
   "total_executions": 500,
@@ -10,9 +10,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 45.892,
-      "timestamp": "2026-10-12T01:29:09.519441+00:00",
-      "report_sha256": "d7254d1e85ed5a4625134c48522bcf4db120d16784aeaef8773e2d332ec3c216"
+      "seconds": 51.753,
+      "timestamp": "2026-10-12T04:48:23.237376+00:00",
+      "report_sha256": "3672d7d1f21ce367c8e9cdd44d80e4e35cef56d11ceb86d7c762148ba9096f70"
     },
     {
       "run": 2,
@@ -20,9 +20,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 44.403,
-      "timestamp": "2026-10-12T01:29:59.879006+00:00",
-      "report_sha256": "f3dd6d9a40bf9b34c143dceb12ac20f1ef22401328ecd0df59c1d7affa7c8029"
+      "seconds": 55.666,
+      "timestamp": "2026-10-12T04:49:19.630482+00:00",
+      "report_sha256": "c6ba2268c25821476332a4a8acef14928d27cc6dfe49224e716be9777ae672d8"
     },
     {
       "run": 3,
@@ -30,9 +30,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 45.187,
-      "timestamp": "2026-10-12T01:30:48.932635+00:00",
-      "report_sha256": "6139cbebd7a952932162e91b891a9c945b5039ee74a8886defc553b85b2acd32"
+      "seconds": 52.836,
+      "timestamp": "2026-10-12T04:50:21.417466+00:00",
+      "report_sha256": "1fc01693b7aa59a797c261139dab91c10c8546805d04b5c45d095d35465e7771"
     },
     {
       "run": 4,
@@ -40,9 +40,9 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 45.964,
-      "timestamp": "2026-10-12T01:31:38.593940+00:00",
-      "report_sha256": "8357d99b469f8be9ee45ecf08fa7bd42f7084a6d03c71978c342aa1aa021ad57"
+      "seconds": 52.532,
+      "timestamp": "2026-10-12T04:51:18.892114+00:00",
+      "report_sha256": "7333f86ea4f1f6e902e4a2ec628fa869584e698a65e431fed429731a97dc71f7"
     },
     {
       "run": 5,
@@ -50,21 +50,21 @@
       "failures": 0,
       "errors": 0,
       "skipped": 0,
-      "seconds": 45.59,
-      "timestamp": "2026-10-12T01:32:29.250271+00:00",
-      "report_sha256": "bf5aece3eea51225376b75f76ffab74912390e7dfdb1d9e0b900bbbb0a4ceb02"
+      "seconds": 51.15,
+      "timestamp": "2026-10-12T04:52:16.017699+00:00",
+      "report_sha256": "9be663a87a34625c9960e1aed501f13b2688066bbd31113cd9d77d42ccbe90b0"
     }
   ],
+  "tested_source": "22ffd5bdea0e53827b48ec3e524ff61232039ba9",
+  "windows_verified_run": 38205292513,
+  "ci_verified_run": 38205292556,
   "additional_manual_checks": [
-    "Actual Tiny-SD and Small-SD published weights: CPU training, continuation, adapter changes, loading learned adapter, PNG generation",
-    "Actual Chromium: existing version -> generation-test training -> select trained version -> CPU generation -> PNG preview; desktop/mobile layout",
-    "CPU learning peak worker RSS: Tiny-SD 2.824 GiB, Small-SD 3.499 GiB on development host; not user-PC benchmark",
-    "Actual AnimateDiff temporal/spatial LoRA training, continuation, selected version generates 720p H.264 plus AAC Japanese speech",
-    "Actual gpt-oss:20b baseline/learned comparison, evaluate/correct, immutable next version and next response; desktop/mobile",
-    "Windows release gate: real installed-runtime Tiny-SD CPU training, continuation, PNG and ZIP download, restart persistence",
-    "Windows release gate: v0.1.5 installer upgrade, WebView2 training selections, CPU/DirectML isolated setup, five starts/uploads/exits/uninstall"
-  ],
-  "tested_source": "c6cc2f62d48ddee5a170ce73978778cec7370ce0",
-  "windows_verified_run": 38192052646,
-  "ci_verified_run": 38192052601
+    "Published Tiny-SD and DreamShaper 8 weights: related discovery, CPU training, continuation and before/after PNG generation",
+    "Published BLIP and CLIP: local caption/style/similarity, Commons source and duplicate filtering",
+    "Actual AnimateDiff CPU training with an automatically selected related video; saved adapter used for Japanese speech plus MP4 generation",
+    "Actual gpt-oss:20b Think/image and Research/video responses; fresh official guide reads and cited material metadata",
+    "Desktop/mobile persisted-project preset, automatic discovery and Think/Research controls; source screenshots",
+    "Windows CI: fresh EXE, v0.1.6 upgrade, CPU/DirectML setup, real related discovery/LoRA/continuation/PNG, five starts and exits",
+    "Actual CPU Real-ESRGAN anime/photo weights, tiled 2x/4x output, optional denoising, before/after images and source preservation"
+  ]
 }

@@ -1,0 +1,52 @@
+{
+  "project": "7c4a10bd099a4ae8a314685afa87b45f",
+  "reference": "8ad83139a2364beeb166f9dd15828ec0",
+  "records": [
+    {
+      "job": "dffcd657bdd34437b45f10cc905f32fd",
+      "settings": {
+        "public_model": "tiny"
+      },
+      "seconds": 23.49,
+      "peak_rss_gib": 2.698,
+      "execution": {
+        "backend": "cpu",
+        "model": "segmind/tiny-sd",
+        "reference_id": "8ad83139a2364beeb166f9dd15828ec0",
+        "reference_strength": 0.55,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "fallback_reason": null
+      }
+    },
+    {
+      "job": "2b92578e07f941eb964c3dfe61eaa70c",
+      "settings": {
+        "trained_job_id": "45f4307016e64b5887c98b2c1258c2d2",
+        "compare_before": true
+      },
+      "seconds": 43.16,
+      "peak_rss_gib": 2.763,
+      "execution": {
+        "backend": "cpu",
+        "model": "segmind/tiny-sd",
+        "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+        "adapter_id": "45f4307016e64b5887c98b2c1258c2d2",
+        "comparison": true,
+        "reference_id": "8ad83139a2364beeb166f9dd15828ec0",
+        "reference_strength": 0.55,
+        "seed": 42,
+        "prompt": "anime illustration of an adult woman, blue hair, sunset background",
+        "inference_steps": 20,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "elapsed_seconds": 40.15
+      }
+    }
+  ],
+  "source_preserved": true
+}

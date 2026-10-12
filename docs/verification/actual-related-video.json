@@ -1,0 +1,77 @@
+{
+  "project": "d335566043e74c4c8369469c8d3cf263",
+  "data_root": "/workspace/personal-ai-studio/artifacts/learning-related-video",
+  "records": [
+    {
+      "job": "29911b83e753430cb0556f0897621dc1",
+      "kind": "train",
+      "seconds": 454.32,
+      "max_rss_gib": 10.144,
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "motion_model": "guoyww/animatediff-motion-adapter-v1-5-2",
+        "adapter_id": null,
+        "seed": 42,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "frames": 16,
+        "fps": 8,
+        "audio_model": null,
+        "elapsed_seconds": 451.3
+      },
+      "related_report": {
+        "stage": "ready",
+        "kind": "video",
+        "added": 1,
+        "queries": [
+          "man ground",
+          "cat mud",
+          "two cats"
+        ],
+        "selected": [
+          {
+            "id": "aa0b5c1f57f04f628dc4a68b1a5bbe55",
+            "page": "https://commons.wikimedia.org/wiki/File:Cat_yawning_in_slow_motion.webm",
+            "license": "CC BY-SA 4.0",
+            "similarity": 0.7857
+          }
+        ],
+        "warnings": [
+          "取得できない、または対応外のメディアを1件除外しました",
+          "取得できない、または対応外のメディアを1件除外しました"
+        ],
+        "anchors": [
+          "3ded8179afd2445abc3104ea0b474b07",
+          "2c10955479e445cdbfa62ccd0413dbc2",
+          "c1734421bf044064870d3572fef0b48f"
+        ],
+        "inspected": 30,
+        "rejected": 29
+      }
+    },
+    {
+      "job": "b85dbb7b3d0040ea9b6deac155f8f0bd",
+      "kind": "generate",
+      "seconds": 1413.74,
+      "max_rss_gib": 9.765,
+      "execution": {
+        "backend": "cpu",
+        "model": "Lykon/dreamshaper-8",
+        "motion_model": "guoyww/animatediff-motion-adapter-v1-5-2",
+        "adapter_id": "29911b83e753430cb0556f0897621dc1",
+        "seed": 42,
+        "native_resolution": [
+          256,
+          256
+        ],
+        "frames": 16,
+        "fps": 8,
+        "audio_model": "kokoro",
+        "elapsed_seconds": 1409.45
+      }
+    }
+  ]
+}

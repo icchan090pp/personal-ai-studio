@@ -8,9 +8,9 @@ permissions:
   contents: write
   actions: read
 env:
-  VERIFIED_WINDOWS_RUN: "38192052646"
-  VERIFIED_TEST_RUN: "38192052601"
-  VERIFIED_SOURCE: "c6cc2f62d48ddee5a170ce73978778cec7370ce0"
+  VERIFIED_WINDOWS_RUN: "38205292513"
+  VERIFIED_TEST_RUN: "38205292556"
+  VERIFIED_SOURCE: "22ffd5bdea0e53827b48ec3e524ff61232039ba9"
 jobs:
   verify_release:
     runs-on: ubuntu-latest
@@ -96,8 +96,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v0.1.6 >/dev/null 2>&1; then
-            echo 'v0.1.6 already exists; published installers must not be overwritten.'
+          if gh release view v0.1.7 >/dev/null 2>&1; then
+            echo 'v0.1.7 already exists; published installers must not be overwritten.'
             exit 1
           fi
-          gh release create v0.1.6 artifacts/release/DeeL-Pyess-v0.1.6.zip artifacts/release/DeeL-Pyess-Setup-v0.1.6-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.6 — CPU image and video personalization with gpt-oss agent learning' --prerelease --notes-file docs/release-notes.md
+          gh release create v0.1.7 artifacts/release/DeeL-Pyess-v0.1.7.zip artifacts/release/DeeL-Pyess-Setup-v0.1.7-Windows-x64.exe artifacts/release/SHA256SUMS.txt --target "$GITHUB_SHA" --title 'DeeL Pyess v0.1.7 — Related learning, reference images and local restoration' --prerelease --notes-file docs/release-notes.md

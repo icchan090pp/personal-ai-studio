@@ -1,0 +1,155 @@
+{
+  "passed": true,
+  "source": "Successful GitHub Actions Windows workflow and real worker JSON from its logs",
+  "run": 38205292513,
+  "tested_source": "22ffd5bdea0e53827b48ec3e524ff61232039ba9",
+  "workflow": {
+    "conclusion": "success",
+    "headSha": "22ffd5bdea0e53827b48ec3e524ff61232039ba9",
+    "jobs": [
+      {
+        "completedAt": "2026-10-12T05:02:10Z",
+        "conclusion": "success",
+        "databaseId": 114667321997,
+        "name": "windows",
+        "startedAt": "2026-10-12T04:48:39Z",
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v5",
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Install application and build tools",
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Build native Windows installer",
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Install, launch and uninstall the actual EXE",
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Collect Windows diagnostics",
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 8,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v5",
+            "number": 15,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 16,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 17,
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/icchan090pp/personal-ai-studio/actions/runs/38205292513/job/114667321997"
+      }
+    ],
+    "status": "completed"
+  },
+  "actual_cpu_learning": [
+    {
+      "id": "638931007636495b85b89e60cb64e634",
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": null,
+      "comparison": false,
+      "reference_id": null,
+      "reference_strength": null,
+      "seed": 42,
+      "prompt": null,
+      "inference_steps": null,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 108.88
+    },
+    {
+      "id": "d364bdc6e5884602a110cf76dd8ab36e",
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": "638931007636495b85b89e60cb64e634",
+      "comparison": false,
+      "reference_id": null,
+      "reference_strength": null,
+      "seed": 42,
+      "prompt": null,
+      "inference_steps": null,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 54.38
+    },
+    {
+      "id": "8d3701bd18c74378b1a2adb4b033827c",
+      "backend": "cpu",
+      "model": "segmind/tiny-sd",
+      "revision": "cad0bd7495fa6c4bcca01b19a723dc91627fe84f",
+      "adapter_id": "d364bdc6e5884602a110cf76dd8ab36e",
+      "comparison": true,
+      "reference_id": "32d0eb1085b24155b10d9bf0a0e244bf",
+      "reference_strength": 0.55,
+      "seed": 42,
+      "prompt": "a blue circle in the style of circleart",
+      "inference_steps": 20,
+      "native_resolution": [
+        256,
+        256
+      ],
+      "elapsed_seconds": 52.5
+    }
+  ],
+  "checks": [
+    "fresh EXE and WebView2 startup",
+    "v0.1.6 upgrade preserves SQLite bytes",
+    "isolated DirectML and primary CPU runtime setup",
+    "actual Tiny-SD LoRA training and continuation",
+    "trained reference image before/after generation",
+    "five native launches/uploads/exits",
+    "uninstall preserves user data"
+  ]
+}
