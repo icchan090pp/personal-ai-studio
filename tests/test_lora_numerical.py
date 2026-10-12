@@ -5,6 +5,7 @@ This checks math and compatibility, not SD 1.5 or CogVideoX generation quality.
 
 import json
 import zipfile
+from pathlib import Path
 
 import torch
 from diffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
@@ -86,7 +87,7 @@ def test_real_optimizer_export_reload_and_inference(tmp_path, monkeypatch):
     dataset = tmp_path / "projects/model/images"
     dataset.mkdir(parents=True)
     (dataset / "sample.png").write_bytes(png())
-    project = {"id": "model", "name": "numerical test", "trigger": "myconcept"}
+    project = {"id": "model", "name": "日本語の育成版 🌸", "trigger": "myconcept"}
     config = {
         "steps": 10,
         "rank": 4,
@@ -97,17 +98,28 @@ def test_real_optimizer_export_reload_and_inference(tmp_path, monkeypatch):
     }
     progress = []
     metric_records = []
-    train_adapter(
-        pipe,
-        tmp_path,
-        project,
-        config,
-        folder,
-        progress.append,
-        device="cpu",
-        resolution=64,
-        report=metric_records.append,
-    )
+    original_open = Path.open
+
+    def legacy_windows_open(path, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if "b" not in mode and encoding in (None, "locale"):
+            encoding = "cp1252"
+        return original_open(path, mode, buffering, encoding, errors, newline)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", legacy_windows_open)
+        train_adapter(
+            pipe,
+            tmp_path,
+            project,
+            config,
+            folder,
+            progress.append,
+            device="cpu",
+            resolution=64,
+            report=metric_records.append,
+        )
+    card = json.loads((folder / "adapter/model-card.json").read_bytes().decode("utf-8"))
+    assert card["name"] == project["name"]
     state = get_peft_model_state_dict(pipe.unet)
     assert all(torch.isfinite(value).all() for value in state.values())
     assert any(value.abs().sum() > 0 for key, value in state.items() if "lora_B" in key)

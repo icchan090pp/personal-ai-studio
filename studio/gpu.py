@@ -95,7 +95,9 @@ def execute(root, job_id):
             torch.cuda.empty_cache()
         if config.get("voice_job_id"):
             card = json.loads(
-                (root / "jobs" / config["voice_job_id"] / "voice-card.json").read_text()
+                (root / "jobs" / config["voice_job_id"] / "voice-card.json").read_text(
+                    encoding="utf-8"
+                )
             )
             config.update(card.get("controls", {}))
 
@@ -467,7 +469,9 @@ def train_adapter(
         "learning_rate": config["learning_rate"],
         "video": "Image-to-video via CogVideoX; image LoRA is not a video LoRA",
     }
-    (adapter / "model-card.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2))
+    (adapter / "model-card.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     with zipfile.ZipFile(folder / "adapter.zip", "w", zipfile.ZIP_DEFLATED) as archive:
         for file in adapter.iterdir():
             archive.write(file, file.name)

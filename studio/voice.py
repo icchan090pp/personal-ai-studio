@@ -32,7 +32,9 @@ def learn_voice(paths, folder, progress, instruction=""):
         "limitations": "Not full fine-tuning; fidelity depends on model, recordings and language.",
     }
     card.update(instruction=instruction, controls=instruction_controls(instruction))
-    (folder / "voice-card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2))
+    (folder / "voice-card.json").write_text(
+        json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     with zipfile.ZipFile(folder / "adapter.zip", "w", zipfile.ZIP_DEFLATED) as archive:
         archive.write(folder / "speaker.pt", "speaker.pt")
         archive.write(folder / "voice-card.json", "voice-card.json")

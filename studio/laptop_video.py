@@ -172,7 +172,9 @@ def add_audio(root, config, folder):
     if config.get("voice_job_id"):
         from studio.voice import adjust_pitch, apply_voice
 
-        card = json.loads((root / "jobs" / config["voice_job_id"] / "voice-card.json").read_text())
+        card = json.loads(
+            (root / "jobs" / config["voice_job_id"] / "voice-card.json").read_text(encoding="utf-8")
+        )
         config.update(card.get("controls", {}))
     generate_audio(config, folder / "sound.wav")
     if config.get("voice_job_id"):
