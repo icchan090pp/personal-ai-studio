@@ -136,7 +136,10 @@ class Application:
                 try:
                     with urllib.request.urlopen(self.url + "/api/models", timeout=1) as response:
                         models = json.load(response)
-                    if len(models) == 2:
+                    if len(models) >= 2 and {model["kind"] for model in models} == {
+                        "image",
+                        "video",
+                    }:
                         self.events.put(("ready", browser))
                         return
                 except (OSError, ValueError):

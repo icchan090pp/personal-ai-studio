@@ -1,10 +1,13 @@
 """Additional assertions inside the existing hardware and numerical product cases."""
 
+import io
 import json
 import os
+import queue
 import sqlite3
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -82,6 +85,27 @@ def check_hardware_and_setup(root, monkeypatch):
         monkeypatch.context() as patch,
         TestClient(application, client=("127.0.0.1", 40000)) as client,
     ):
+        # Exercise the desktop startup handshake with the expanded real catalog.
+        from windows.desktop import Application
+
+        desktop = Application.__new__(Application)
+        desktop.python = Path(sys.executable)
+        desktop.port = 8000
+        desktop.url = "http://127.0.0.1:8000"
+        desktop.closing = False
+        desktop.events = queue.Queue()
+        desktop.spawn = lambda args: SimpleNamespace(poll=lambda: None)
+        catalog = client.get("/api/models").content
+        assert len(json.loads(catalog)) == 6
+        with monkeypatch.context() as startup_patch:
+            startup_patch.setattr(
+                "windows.desktop.urllib.request.urlopen", lambda *a, **k: io.BytesIO(catalog)
+            )
+            desktop.start()
+            try:
+                assert desktop.events.get(timeout=2) == ("ready", True)
+            finally:
+                desktop.closing = True
         patch.setenv("STUDIO_DESKTOP_COMMAND", str(command))
         assert client.post("/api/system/setup", json={"backend": "unknown"}).status_code == 422
         assert (
